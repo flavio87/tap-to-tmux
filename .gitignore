@@ -1,0 +1,13 @@
+server/data/
+*.log
+.ntm/
+.ft/
+.vscode/
+.claude/
+__pycache__/
+*.pyc
+*.so
+*.db
+*.db-shm
+*.db-wal
+*.lock

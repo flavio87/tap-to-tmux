@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NTM">
+<meta name="theme-color" content="#0d1117">
+<title>NTM Status</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --blue: #58a6ff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+    min-height: 100vh;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 1.3em; font-weight: 600; }
+  header .meta { font-size: 0.85em; color: var(--muted); margin-top: 4px; }
+  header .updated { font-size: 0.75em; color: var(--muted); margin-top: 2px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  @media (min-width: 700px) {
+    .grid { grid-template-columns: 1fr 1fr; max-width: 900px; }
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .indicator.active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .indicator.idle { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+  .indicator.error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .indicator.unknown, .indicator.no_agents { background: var(--muted); }
+  .session-name {
+    font-weight: 600;
+    font-size: 1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .agent-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+  }
+  .agent-row:first-child { border-top: none; padding-top: 4px; }
+  .agent-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .agent-type {
+    font-size: 0.9em;
+    font-weight: 500;
+  }
+  .agent-type.active { color: var(--green); }
+  .agent-type.idle { color: var(--yellow); }
+  .agent-type.error { color: var(--red); }
+  .agent-time {
+    font-size: 0.75em;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  .connect-btn {
+    display: inline-block;
+    background: var(--blue);
+    color: #fff;
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.8em;
+    font-weight: 500;
+    text-align: center;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .connect-btn:active { opacity: 0.7; }
+  .connect-btn.overview {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.75em;
+    padding: 4px 10px;
+    margin-top: 6px;
+  }
+  .connect-btn.overview:active { opacity: 0.7; background: rgba(255,255,255,0.04); }
+  .state-label {
+    font-size: 0.8em;
+    margin-left: auto;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .state-label.active { background: rgba(63,185,80,0.15); color: var(--green); }
+  .state-label.idle { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .state-label.error { background: rgba(248,81,73,0.15); color: var(--red); }
+  .state-label.unknown, .state-label.no_agents { background: rgba(139,148,158,0.15); color: var(--muted); }
+  .loading { text-align: center; color: var(--muted); padding: 40px; }
+  .error-msg { text-align: center; color: var(--red); padding: 20px; }
+
+  /* Spawn modal */
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    width: 90%;
+    max-width: 360px;
+  }
+  .modal-card h2 { font-size: 1.1em; margin-bottom: 14px; }
+  .modal-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 1em;
+    outline: none;
+  }
+  .modal-input:focus { border-color: var(--blue); }
+  .modal-hint {
+    font-size: 0.75em;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .modal-error {
+    font-size: 0.8em;
+    color: var(--red);
+    margin-top: 8px;
+    min-height: 1.2em;
+  }
+  .modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    justify-content: flex-end;
+  }
+  .modal-btn {
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: none;
+    font-size: 0.9em;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .modal-btn.cancel {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .modal-btn.launch {
+    background: var(--blue);
+    color: #fff;
+  }
+  .modal-btn:disabled { opacity: 0.5; cursor: default; }
+  .modal-btn:active:not(:disabled) { opacity: 0.7; }
+
+  /* New Session button in header */
+  .new-btn {
+    display: inline-block;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    padding: 5px 14px;
+    border-radius: 6px;
+    font-size: 0.8em;
+    font-weight: 500;
+    cursor: pointer;
+    margin-left: 8px;
+    vertical-align: middle;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .new-btn:active { opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="title">NTM Status</h1>
+  <div class="meta" id="meta">Loading...<button class="new-btn" onclick="showSpawnModal()">+ New</button></div>
+  <div class="updated" id="updated"></div>
+</header>
+
+<div class="grid" id="grid">
+  <div class="loading">Connecting...</div>
+</div>
+
+<div class="modal-backdrop" id="spawnModal">
+  <div class="modal-card">
+    <h2>New Session</h2>
+    <input class="modal-input" id="spawnName" type="text"
+           placeholder="my-research" autocomplete="off" autocapitalize="none"
+           spellcheck="false">
+    <div class="modal-hint">Lowercase letters, numbers, hyphens. Creates a project directory.</div>
+    <div class="modal-error" id="spawnError"></div>
+    <div class="modal-buttons">
+      <button class="modal-btn cancel" onclick="hideSpawnModal()">Cancel</button>
+      <button class="modal-btn launch" id="spawnBtn" onclick="doSpawn()">Launch</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const AGENT_NAMES = { cc: 'Claude', cod: 'Codex', gmi: 'Gemini' };
+const REFRESH_MS = 10000;
+let lastUpdate = null;
+
+// Detect mobile: touch device with narrow screen (iPhone/iPad in portrait)
+const IS_MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  || (navigator.maxTouchPoints > 0 && window.innerWidth < 800);
+
+function agentName(type) {
+  return AGENT_NAMES[type] || type;
+}
+
+function formatAgentStatus(agent) {
+  if (agent.activity === 'active') return 'working now';
+
+  // last_active = ISO timestamp of last time CPU was active (from server sampler)
+  if (agent.last_active) {
+    const d = new Date(agent.last_active);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHrs = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHrs / 24);
+
+    let ago;
+    if (diffMins < 1) ago = 'just now';
+    else if (diffMins < 60) ago = `${diffMins}m ago`;
+    else if (diffHrs < 24) ago = `${diffHrs}h ${diffMins % 60}m ago`;
+    else ago = `${diffDays}d ago`;
+
+    const isToday = d.toDateString() === now.toDateString();
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = isToday
+      ? time
+      : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + time;
+
+    return `stopped ${dateStr} (${ago})`;
+  }
+
+  // No last_active means never seen active since dashboard started.
+  // Use elapsed_seconds to show how long the process has been running.
+  if (agent.elapsed_seconds != null) {
+    const hrs = Math.floor(agent.elapsed_seconds / 3600);
+    const days = Math.floor(hrs / 24);
+    if (days > 0) return `idle (running ${days}d ${hrs % 24}h)`;
+    if (hrs > 0) return `idle (running ${hrs}h)`;
+    return 'idle';
+  }
+
+  return 'idle';
+}
+
+function renderStatus(data) {
+  document.getElementById('title').textContent =
+    `NTM Status \u2014 ${data.machine}`;
+  document.getElementById('meta').innerHTML =
+    `${data.session_count} sessions \u00b7 ${data.total_agents} agents`
+    + `<button class="new-btn" onclick="showSpawnModal()">+ New</button>`;
+  document.getElementById('updated').textContent =
+    `Updated ${new Date().toLocaleTimeString()}`;
+
+  const grid = document.getElementById('grid');
+
+  // Sort: error first, then idle, then active, then unknown
+  const order = { error: 0, idle: 1, active: 2, no_agents: 3, unknown: 4 };
+  const sessions = data.sessions.slice().sort((a, b) =>
+    (order[a.overall_state] ?? 4) - (order[b.overall_state] ?? 4)
+    || a.name.localeCompare(b.name)
+  );
+
+  grid.innerHTML = sessions.map(s => {
+    const state = s.overall_state;
+    const stateDisplay = state === 'no_agents' ? 'empty' : state;
+
+    // Number agents of same type for disambiguation (Codex 1, Codex 2, ...)
+    const typeCounter = {};
+    const typeTotals = {};
+    s.agents.forEach(a => {
+      const t = agentName(a.type);
+      typeTotals[t] = (typeTotals[t] || 0) + 1;
+    });
+
+    const agentRows = s.agents.map(a => {
+      const t = agentName(a.type);
+      typeCounter[t] = (typeCounter[t] || 0) + 1;
+      const label = typeTotals[t] > 1 ? `${t} ${typeCounter[t]}` : t;
+      const timeStr = formatAgentStatus(a);
+
+      // Mobile: Blink deep link to specific pane. Desktop: no per-agent link needed.
+      const connectBtn = IS_MOBILE
+        ? `<a class="connect-btn" href="${a.blink_url}">Connect</a>`
+        : '';
+
+      return `
+        <div class="agent-row">
+          <div class="indicator ${a.activity}" style="width:10px;height:10px;"></div>
+          <div class="agent-info">
+            <div class="agent-type ${a.activity}">${label}</div>
+            <div class="agent-time">${timeStr}${a.rate_limited ? ' \u00b7 rate limited' : ''}</div>
+          </div>
+          ${connectBtn}
+        </div>`;
+    }).join('');
+
+    const noAgents = s.agents.length === 0
+      ? '<div style="color:var(--muted);font-size:0.85em;padding:6px 0;">no agents</div>'
+      : '';
+
+    // Mobile: Blink overview link. Desktop: ntm-connect:// to activate WezTerm tab.
+    const sessionLink = IS_MOBILE
+      ? `<a class="connect-btn overview" href="${s.blink_url}">Overview</a>`
+      : `<a class="connect-btn overview" href="${s.desktop_url}">Open in WezTerm</a>`;
+
+    return `
+      <div class="card">
+        <div class="card-header">
+          <div class="indicator ${state}"></div>
+          <span class="session-name">${s.name}</span>
+          <span class="state-label ${state}">${stateDisplay}</span>
+        </div>
+        ${agentRows}${noAgents}
+        ${sessionLink}
+      </div>
+    `;
+  }).join('');
+}
+
+async function refresh() {
+  try {
+    const resp = await fetch('/api/status');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    renderStatus(data);
+    lastUpdate = Date.now();
+  } catch (err) {
+    // Only show error if we never loaded successfully
+    if (!lastUpdate) {
+      document.getElementById('grid').innerHTML =
+        `<div class="error-msg">Failed to load: ${err.message}</div>`;
+    }
+    console.error('Refresh failed:', err);
+  }
+}
+
+refresh();
+setInterval(refresh, REFRESH_MS);
+
+// ── Spawn modal ──────────────────────────────────────────
+const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+function showSpawnModal() {
+  const modal = document.getElementById('spawnModal');
+  const input = document.getElementById('spawnName');
+  const error = document.getElementById('spawnError');
+  input.value = '';
+  error.textContent = '';
+  modal.classList.add('open');
+  setTimeout(() => input.focus(), 50);
+}
+
+function hideSpawnModal() {
+  document.getElementById('spawnModal').classList.remove('open');
+}
+
+// Close modal on backdrop click
+document.getElementById('spawnModal').addEventListener('click', function(e) {
+  if (e.target === this) hideSpawnModal();
+});
+
+// Enter key submits
+document.getElementById('spawnName').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doSpawn();
+  if (e.key === 'Escape') hideSpawnModal();
+});
+
+async function doSpawn() {
+  const input = document.getElementById('spawnName');
+  const error = document.getElementById('spawnError');
+  const btn = document.getElementById('spawnBtn');
+  const name = input.value.trim();
+
+  // Client-side validation
+  if (!name) { error.textContent = 'Name is required'; return; }
+  if (name.length < 2 || name.length > 50) {
+    error.textContent = 'Name must be 2-50 characters'; return;
+  }
+  if (!NAME_RE.test(name)) {
+    error.textContent = 'Lowercase letters, numbers, and hyphens only'; return;
+  }
+
+  error.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Launching...';
+
+  try {
+    const resp = await fetch('/api/spawn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await resp.json();
+    if (!data.ok) {
+      error.textContent = data.error || 'Spawn failed';
+      return;
+    }
+    hideSpawnModal();
+    // Refresh to show new card
+    await refresh();
+
+    // On mobile, offer to connect immediately via Blink
+    if (IS_MOBILE) {
+      const cfg = await fetch('/api/config').then(r => r.json());
+      const sshCmd = `ssh -t ${cfg.SSH_USER}@${cfg.SSH_HOST} `
+        + `/home/${cfg.SSH_USER}/.local/bin/tmux-mobile-attach.sh ${name}`;
+      const blinkUrl = `blinkshell://run?key=${cfg.BLINK_KEY}`
+        + `&cmd=${encodeURIComponent(sshCmd)}`;
+      window.location.href = blinkUrl;
+    }
+  } catch (err) {
+    error.textContent = `Network error: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Launch';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# ntfy server configuration (for self-hosted setup)
+# See https://docs.ntfy.sh/config/ for all options
+base-url: https://ntfy.example.com
+upstream-base-url: https://ntfy.sh
+cache-file: /var/cache/ntfy/cache.db
+auth-default-access: read-write
+behind-proxy: true

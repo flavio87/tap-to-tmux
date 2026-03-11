@@ -1,0 +1,28 @@
+name: ShellCheck
+
+on:
+  push:
+    paths:
+      - "**/*.sh"
+  pull_request:
+    paths:
+      - "**/*.sh"
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck on all .sh files
+        run: |
+          shopt -s globstar
+          shellcheck -x \
+            -e SC1091 \
+            -e SC2034 \
+            -e SC2154 \
+            -e SC2015 \
+            **/*.sh

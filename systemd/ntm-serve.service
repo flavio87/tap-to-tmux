@@ -1,0 +1,14 @@
+[Unit]
+Description=NTM REST API & SSE Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/ntm serve --host=127.0.0.1 --port=7337
+Restart=on-failure
+RestartSec=5
+Environment=HOME=%h
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

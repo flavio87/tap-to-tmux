@@ -1,0 +1,15 @@
+[Unit]
+Description=FrankenTerm Watcher Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/ft watch --foreground --notify-only --notify-via webhook --notify-filter "*.usage.*,*.error.*,*.auth.*,*.approval_needed" --poll-interval 10000
+Restart=on-failure
+RestartSec=5
+Environment=HOME=%h
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+Environment=FT_WORKSPACE=%h/cc-notify
+
+[Install]
+WantedBy=default.target

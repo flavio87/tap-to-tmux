@@ -1,0 +1,14 @@
+[Unit]
+Description=NTM Status Dashboard Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/bin/ntm-dashboard-server.py
+Restart=always
+RestartSec=5
+Environment=HOME=%h
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

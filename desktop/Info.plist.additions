@@ -1,0 +1,14 @@
+<!-- Add this block inside the top-level <dict> of
+     ~/Applications/NTMConnect.app/Contents/Info.plist -->
+
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>NTM Connect</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ntm-connect</string>
+			</array>
+		</dict>
+	</array>
