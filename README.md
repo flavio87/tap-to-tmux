@@ -295,46 +295,91 @@ Edit `server/server.yml` with your domain, then set `NTFY_SERVER` in your config
 
 ## cc-notify vs Claude Code Remote Control
 
-Claude Code now has a built-in [Remote Control](https://docs.anthropic.com/en/docs/claude-code/remote-control) feature — connect to running sessions from your phone's browser at `claude.ai/code`, scan a QR code, auto-reconnect after sleep. So when do you still need cc-notify?
+Claude Code now has a built-in [Remote Control](https://docs.anthropic.com/en/docs/claude-code/remote-control) feature — connect to running sessions from your phone via `claude.ai/code` or the Claude iOS app, scan a QR code, auto-reconnect after sleep. These two approaches solve overlapping problems in different ways, and they can work together.
 
-### What Remote Control replaces
+### Two different philosophies
 
-| Capability | Remote Control | cc-notify |
-|------------|:-:|:-:|
-| See what Claude is doing from your phone | Yes (web UI) | No (notification context only) |
-| Reconnect to a session after walking away | Yes (auto-reconnect) | No (you SSH in manually) |
-| Send prompts from mobile | Yes (full web editor) | No (you type in Blink/terminal) |
-| Zero-setup mobile access | Yes (QR code) | No (requires ntfy + Blink config) |
+**Remote Control** gives you a web-based window into a single Claude Code session. You open the app, find the session, see what's happening, type a response. It's a remote desktop for Claude Code.
 
-**If you run a single Claude Code session and just want to check on it from your phone, Remote Control is simpler and sufficient.**
+**cc-notify + Blink Shell** gives you a push-based notification system with one-tap deep links into your full terminal environment. You don't check — it tells you. You don't open a web UI — you tap a notification and land in your real tmux session via Blink Shell, with all your panes, tools, and layout intact.
 
-### Where cc-notify still wins
+### Comparison across five dimensions
 
-| Capability | Remote Control | cc-notify |
-|------------|:-:|:-:|
-| **Native push notifications** | No — you must open the web UI to check | Yes — OS-level push via ntfy |
-| **"Come back now" alerts** | No — no way to know when Claude needs you | Yes — fires on permission prompts, idle, done |
-| **Multi-agent monitoring** | No — one session at a time | Yes — NTM polls all agents, notifies per-project |
-| **Non-Claude agents** (Codex, Gemini CLI) | No — CC only | Yes — any tmux-based agent via NTM |
-| **Tap-to-tmux deep links** | No — web terminal only | Yes — Blink Shell into your real tmux layout |
-| **Notification history** | No — ephemeral | Yes — ntfy retains a timeline |
-| **Self-hosted / private** | No — routes through Anthropic | Yes — self-hosted ntfy option |
-| **Slack / webhook delivery** | No | Yes |
+#### 1. Awareness — how do you know something needs attention?
 
-### The core difference
+This is the fundamental difference.
 
-**Remote Control is pull-based** — you check when you feel like it. **cc-notify is push-based** — it tells you the moment something needs attention.
+| | Remote Control | cc-notify + Blink |
+|---|---|---|
+| **Permission prompt** | You don't know until you open the app and check | Push notification hits your lock screen instantly |
+| **Task finished** | You don't know until you check | Push notification with context about what finished |
+| **Agent idle/errored** | You don't know until you check | Push notification per-project |
+| **Multiple agents blocked** | Check each session one by one | One notification per blocked agent, each with its own deep link |
 
-If you're running 5 Claude Code agents across 3 projects and walk away to make coffee, Remote Control requires you to open a browser and click through each session to see which ones are blocked. cc-notify sends one push notification per blocked agent with the project name, what it was doing, and a tap-to-connect button that drops you into the exact tmux pane.
+Remote Control has **no push notifications** as of today — this is an [open feature request](https://github.com/anthropics/claude-code/issues/29438). You must actively poll the web UI. If you walk away from your phone, you have no idea when Claude needs you.
 
-### When to use what
+cc-notify is built around the opposite model: you walk away, and **it finds you** when something needs attention.
 
-- **Solo session, quick check-in** → Remote Control is enough
-- **Long-running tasks, walk away, come back when needed** → cc-notify
-- **Multiple parallel agents** → cc-notify + NTM
-- **Mixed agent types** (CC + Codex + Gemini) → cc-notify (only option)
-- **tmux-centric workflow** (custom layouts, splits, persistent sessions) → cc-notify + Blink
-- **Both** → They complement each other. Use Remote Control for interactive work, cc-notify for async "tap me when it's time"
+#### 2. Getting there — how do you connect?
+
+| | Remote Control | cc-notify + Blink |
+|---|---|---|
+| **Initial setup** | `/remote-control` in session, scan QR | Install cc-notify, configure ntfy + Blink key |
+| **Reconnecting** | Open Claude app → find session | Tap notification → Blink opens → SSH → tmux pane (one tap) |
+| **What you land in** | Web-based terminal in a browser/app | Native terminal (Blink Shell) attached to your tmux session |
+| **Pane targeting** | Lands in the session (no pane control) | Deep link targets the exact pane where Claude is waiting, zoomed |
+
+The deep link flow in cc-notify means you go from lock screen to the right tmux pane in a single tap. Blink Shell handles the SSH connection, `tmux-mobile-attach.sh` creates an independent mobile viewport, selects the pane, and zooms it. No manual SSH, no finding the session, no navigating panes.
+
+#### 3. The experience once connected
+
+| | Remote Control | cc-notify + Blink |
+|---|---|---|
+| **Interface** | Web UI (responsive, but browser-based) | Full native terminal via Blink Shell |
+| **Send prompts** | Yes, via web editor | Yes, via Blink terminal (full keyboard, shell access) |
+| **See live output** | Yes, in the web view | Yes, in your real tmux session |
+| **Access other tools** | No — scoped to the CC session | Yes — full shell, other panes, vim, git, anything |
+| **Custom tmux layouts** | No — web renders its own view | Yes — your desktop layout is preserved; mobile gets an independent viewport |
+| **Terminal features** | Limited (web rendering) | Full (Blink supports mosh, key forwarding, themes, fonts) |
+
+Both let you see what Claude is doing and send prompts. The difference is depth: Remote Control gives you a Claude-scoped web view, while Blink gives you your full terminal environment. If you need to check a log file, run a test, or peek at another pane while Claude is waiting — Blink has it, Remote Control doesn't.
+
+#### 4. Scale — multiple agents and projects
+
+| | Remote Control | cc-notify + Blink |
+|---|---|---|
+| **Multiple CC sessions** | Switch between sessions in web UI | One notification per session, each with its own deep link |
+| **Dashboard / overview** | Session list in web UI | NTM dashboard shows all agents with status, health, uptime |
+| **Non-CC agents** (Codex, Gemini CLI, etc.) | Not supported | Fully supported via NTM polling |
+| **Per-project deduplication** | N/A | One notification per project, cooldown until you interact |
+
+This is where the gap is widest. If you run multiple agents across projects — especially mixed agent types — Remote Control has no way to aggregate or notify. cc-notify with NTM gives you a single dashboard plus targeted notifications.
+
+#### 5. Infrastructure and privacy
+
+| | Remote Control | cc-notify + Blink |
+|---|---|---|
+| **Traffic routing** | Session data through Anthropic's servers | Direct SSH to your VPS (nothing leaves your infra) |
+| **Self-hosted option** | No | Yes — self-hosted ntfy server |
+| **Slack / webhook integration** | No | Yes — dual delivery to any webhook |
+| **Notification history** | None — ephemeral web session | ntfy retains a searchable timeline |
+| **Offline tolerance** | ~10 min timeout, then session drops | tmux sessions persist indefinitely; reconnect anytime |
+
+### When to use which
+
+| Scenario | Best tool | Why |
+|----------|-----------|-----|
+| Quick check on a single CC session from your couch | **Remote Control** | Simplest path — QR code, zero config |
+| Walk away for hours, come back only when needed | **cc-notify** | Push notifications mean you don't waste time polling |
+| Running 3+ CC agents across different projects | **cc-notify + NTM** | Per-project notifications + dashboard overview |
+| Mixed agents (CC + Codex + Gemini CLI) | **cc-notify + NTM** | Only option — Remote Control is CC-only |
+| tmux power user (custom layouts, splits, persistent sessions) | **cc-notify + Blink** | You stay in your real terminal environment |
+| Need to check logs, run tests, or use other tools from mobile | **cc-notify + Blink** | Full shell access, not just a CC session view |
+| Both — interactive when active, async when away | **Both together** | Remote Control for in-the-moment work, cc-notify for "tap me when it's time" |
+
+### They're complementary
+
+You don't have to choose. Remote Control is great for interactive check-ins when you're actively working from your phone. cc-notify is great for the other 90% of the time — when you've walked away and need to know the moment something needs attention, then get back to the right place in one tap.
 
 ## Optional integrations
 
