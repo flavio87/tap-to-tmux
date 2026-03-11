@@ -31,6 +31,20 @@ fi
 
 ntfy_log INFO "Hook fired: type=${NOTIFICATION_TYPE} project=${PROJECT} session_id=${SESSION_ID}"
 
+# --- Directory exclusions ---
+# If CWD starts with any path in NOTIFY_EXCLUDE_DIRS (colon-separated), skip silently.
+# Set in config.env: NOTIFY_EXCLUDE_DIRS="/data/notes:/home/user/personal"
+if [[ -n "${NOTIFY_EXCLUDE_DIRS:-}" && -n "$CWD" ]]; then
+    IFS=: read -ra _exclude_list <<< "$NOTIFY_EXCLUDE_DIRS"
+    for _excl in "${_exclude_list[@]}"; do
+        [[ -z "$_excl" ]] && continue
+        if [[ "$CWD" == "$_excl"* ]]; then
+            ntfy_log INFO "CWD '$CWD' matches exclusion '$_excl', skipping notification"
+            exit 0
+        fi
+    done
+fi
+
 # --- Deduplication ---
 # All "needs attention" events (idle, permission, stop) share ONE cooldown per project.
 # You get one notification when a session needs you, then silence until the cooldown expires.
