@@ -2,6 +2,25 @@
 
 Push notifications and one-tap deep links for AI agents running in **tmux** on a remote server.
 
+## Table of contents
+
+- [Who this is for](#who-this-is-for)
+- [Key features](#key-features)
+- [How it works](#how-it-works)
+- [Tap-to-connect deep links](#tap-to-connect-deep-links)
+- [Notification delivery](#notification-delivery)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Claude Code hooks setup](#claude-code-hooks-setup)
+- [Starting the services](#starting-the-services)
+- [Health check](#health-check)
+- [Troubleshooting](#troubleshooting)
+- [Project structure](#project-structure)
+- [Self-hosted ntfy server](#self-hosted-ntfy-server)
+- [cc-notify vs Claude Code Remote Control](#cc-notify-vs-claude-code-remote-control)
+- [FAQ](#faq)
+
 ## Who this is for
 
 You run Claude Code, Codex, Gemini CLI, or other AI agents inside **tmux sessions** on a VPS, cloud instance, or any machine reachable via SSH. You walk away — to make coffee, take a call, work on something else. When an agent finishes, needs permission, or hits an error, **cc-notify sends a push notification to your phone** with context about what happened. Tap the notification and [Blink Shell](https://blink.sh) opens an SSH connection straight into the exact tmux pane where the agent is waiting.
@@ -17,7 +36,7 @@ The remote machine can be anything reachable via SSH — a cloud VPS, a dedicate
 - **Any agent in tmux** — Claude Code, Codex, Gemini CLI, or anything else running in a tmux session
 - **Smart deduplication** — one notification per project, cooldown resets on interaction
 - **Multi-agent dashboard** via optional [NTM](https://github.com/cyanheads/ntm) polling
-- **Dual delivery** — ntfy + optional Slack webhook
+- **Extensible delivery** — ntfy and Slack built-in; hook architecture pipes to Discord, Telegram, Teams, email, or any webhook with minimal code
 
 ## How it works
 
@@ -27,7 +46,7 @@ cc-notify has two notification layers:
 
 2. **NTM agent monitor** (`ntm-notify-monitor.sh`) — Polls [NTM](https://github.com/cyanheads/ntm) health for non-CC agents (Codex, Gemini CLI, etc.) and sends notifications when they go idle or error. Optional — only needed if you run multiple agent types.
 
-Both layers deliver via [ntfy](https://ntfy.sh) (push notifications) and optionally Slack (incoming webhook).
+Both layers deliver via [ntfy](https://ntfy.sh) (push notifications) out of the box, with built-in Slack support and an extensible hook architecture that can pipe to [any notification service](#notification-delivery).
 
 ### Notification types
 
@@ -146,6 +165,66 @@ The mobile attach script creates a *grouped* tmux session (`mob-$$`) rather than
 <!-- TODO: Add a short (~30s) video walkthrough showing the tap-to-connect
   experience end-to-end. Host on GitHub or link to a public URL.
 -->
+
+## Notification delivery
+
+cc-notify's hook system extracts rich context from your agent sessions — task name, last response, project, machine, event type — and pipes it to any notification service. ntfy and Slack are built-in. Adding new destinations is straightforward because the architecture is simple: shell functions that receive structured data and `curl` it to an endpoint.
+
+### Built-in destinations
+
+| Destination | Status | Config variable | What you get |
+|-------------|--------|-----------------|--------------|
+| [ntfy](https://ntfy.sh) | Built-in | `NTFY_TOPIC` | Push notifications on iOS/Android with priority, tags, action buttons, and Blink deep links |
+| [Slack](https://slack.com) | Built-in | `SLACK_WEBHOOK_URL` | Formatted messages via incoming webhook with project context |
+
+### Adding new destinations
+
+Each notification destination is a shell function that receives title, priority, body, and the Blink deep link URL. Adding a new one means writing a function in `scripts/ntfy-notify-common.sh` and calling it from the hook. Here's what the most popular integrations look like:
+
+| Destination | Effort | How it works |
+|-------------|--------|--------------|
+| [Discord](https://discord.com) | ~20 lines | Incoming webhook — almost identical to Slack. POST JSON with `content` and `embeds` to your webhook URL. |
+| [Telegram](https://telegram.org) | ~30 lines | Bot API — `curl` POST to `api.telegram.org/bot<TOKEN>/sendMessage` with `chat_id` and formatted text. Create a bot via [@BotFather](https://t.me/botfather). |
+| [Pushover](https://pushover.net) | ~15 lines | Simple HTTP API — POST `token`, `user`, `title`, `message`, and optional `url` (for deep link). One of the easiest integrations. |
+| [Microsoft Teams](https://www.microsoft.com/en-us/microsoft-teams) | ~30 lines | Incoming webhook or Workflows connector — POST an Adaptive Card JSON payload. |
+| [Email](https://en.wikipedia.org/wiki/Email) | ~25 lines | `sendmail`, `msmtp`, or `curl` via SMTP relay. Useful for logging or team-wide alerts. |
+| [PagerDuty](https://www.pagerduty.com) | ~35 lines | Events API v2 — POST a `trigger` event with `routing_key`, severity, and summary. Good for on-call workflows. |
+| [Gotify](https://gotify.net) | ~15 lines | Self-hosted push server — POST `title` and `message` to your Gotify instance. Similar to ntfy but self-hosted only. |
+| Generic webhook | ~10 lines | `curl` POST a JSON payload to any URL. Works with Zapier, Make, n8n, IFTTT, or any HTTP endpoint. |
+
+### Example: adding Discord
+
+```bash
+# Add to scripts/ntfy-notify-common.sh
+send_discord_notification() {
+    local title="$1" priority="$2" body="$3" blink_url="$4"
+    [[ -z "${DISCORD_WEBHOOK_URL:-}" ]] && return 0
+
+    local color=3447003  # blue
+    [[ "$priority" == "high" || "$priority" == "urgent" ]] && color=15158332  # red
+
+    curl -s -o /dev/null -X POST "$DISCORD_WEBHOOK_URL" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -n \
+            --arg title "$title" \
+            --arg body "$body" \
+            --arg url "${blink_url:-}" \
+            --argjson color "$color" \
+            '{embeds: [{title: $title, description: $body, color: $color, url: $url}]}'
+        )"
+}
+```
+
+Then add `DISCORD_WEBHOOK_URL=""` to your `config.env` and call the function from the hook. The same pattern works for any destination.
+
+### Architecture
+
+The hook system is intentionally simple — no plugin framework, no message bus. Each destination is an independent `curl` call fired in the background. This means:
+
+- **No single point of failure** — if Discord's webhook is down, ntfy still delivers
+- **No dependencies** — each destination only needs `curl` and `jq`
+- **Easy to test** — call any send function directly from the command line
+- **Parallel delivery** — all destinations fire concurrently via background jobs
 
 ## Prerequisites
 
@@ -372,7 +451,7 @@ This is where the gap is widest. If you run multiple agents across projects — 
 |---|---|---|
 | **Traffic routing** | Session data through Anthropic's servers | Direct SSH to your VPS (nothing leaves your infra) |
 | **Self-hosted option** | No | Yes — self-hosted ntfy server |
-| **Slack / webhook integration** | No | Yes — dual delivery to any webhook |
+| **Multi-destination delivery** | No | Yes — ntfy, Slack, Discord, Telegram, Teams, email, any webhook |
 | **Notification history** | None — ephemeral web session | ntfy retains a searchable timeline |
 | **Offline tolerance** | ~10 min timeout, then session drops | tmux sessions persist indefinitely; reconnect anytime |
 
@@ -392,11 +471,48 @@ This is where the gap is widest. If you run multiple agents across projects — 
 
 You don't have to choose. Remote Control is great for interactive check-ins when you're actively working from your phone. cc-notify is great for the other 90% of the time — when you've walked away and need to know the moment something needs attention, then get back to the right place in one tap.
 
-## Optional integrations
+## Other integrations
 
-- **Slack**: Dual delivery via incoming webhook. Set `SLACK_WEBHOOK_URL` in config.
 - **FrankenTerm**: File watcher integration via the `ft-watch` systemd unit. See `systemd/ft-watch.service`.
 - **NTM**: Multi-agent session management. The monitor script polls NTM health for state transitions. Not required for basic CC notifications.
+
+## FAQ
+
+### Do I need an iPhone or Blink Shell?
+
+**No.** The push notifications work on any phone with the ntfy app (iOS or Android). The Blink Shell deep links are an iOS-specific bonus — without them, you still get notifications with full context (project name, what Claude was doing, what it said). You just connect to your server via your preferred SSH client instead of getting the one-tap experience. On Android, [Termux](https://termux.dev) with an SSH shortcut widget is a solid alternative.
+
+### Does this work with agents other than Claude Code?
+
+**Yes.** The Claude Code hook (`tmux-notify.sh`) fires on CC lifecycle events specifically, but the NTM agent monitor (`ntm-notify-monitor.sh`) works with any agent that runs in a tmux session — Codex, Gemini CLI, Aider, or custom scripts. NTM polls session health regardless of what agent is inside it.
+
+### Can I use this on a laptop instead of a VPS?
+
+**Yes** — as long as the machine is reachable via SSH. If your laptop is on the same network, local SSH works. For remote access, [Tailscale](https://tailscale.com) makes any machine reachable by its Tailscale hostname or IP without port forwarding or dynamic DNS. Set `SSH_HOST` to your Tailscale address and deep links work from anywhere.
+
+### Can I self-host everything?
+
+**Yes.** ntfy can be [self-hosted](https://docs.ntfy.sh/install/) via Docker (config included in `server/`). SSH is direct to your machine. The NTM dashboard runs locally. No data needs to leave your infrastructure. The only external dependency is the ntfy mobile app, which connects to your self-hosted server instead of ntfy.sh.
+
+### Can multiple people get notifications for the same server?
+
+**Yes.** ntfy is topic-based — anyone who subscribes to the same topic receives notifications. You can also set up separate topics per person or per project, or use Slack webhook delivery for team-wide visibility.
+
+### What happens if my SSH connection drops mid-session?
+
+The mobile viewport (`mob-*` grouped session) is cleaned up automatically. Your actual tmux session and the agent inside it are unaffected — tmux sessions persist until explicitly killed. The next notification will include a fresh deep link to reconnect.
+
+### How is this different from just using `notify-send` or `osascript` in a hook?
+
+Those are local desktop notifications — they only work if you're sitting at the machine. cc-notify sends push notifications to your phone via ntfy, adds Blink Shell deep links for one-tap reconnection, handles per-project deduplication with cooldowns, extracts rich context from the agent's transcript, and optionally pipes to Slack, Discord, or any other service. It's the difference between "beep on my desktop" and "page me on my phone with context and a connect button."
+
+### I only run one Claude Code session. Is this overkill?
+
+Maybe. If you're running a single session and check your phone regularly, Claude Code's [Remote Control](https://docs.anthropic.com/en/docs/claude-code/remote-control) might be simpler — it's built-in, zero config, and gives you a web view. But if you walk away and want to know the *moment* Claude needs you (instead of discovering it 20 minutes later), the push notification alone is worth the setup. The install takes under 5 minutes.
+
+### Can I send notifications to Discord / Telegram / Teams / email?
+
+**Yes.** The hook architecture pipes structured data (title, priority, body, deep link URL) to shell functions that `curl` endpoints. ntfy and Slack are built-in; adding a new destination is ~15-35 lines of bash. See the [Notification delivery](#notification-delivery) section for integration guides and a Discord example.
 
 ## License
 
