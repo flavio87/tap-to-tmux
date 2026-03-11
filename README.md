@@ -1,15 +1,22 @@
 # cc-notify
 
-Phone notifications when Claude Code (or other AI agents) need your attention on a remote server — with **one-tap deep links** to jump straight into the right tmux session from your phone.
+Push notifications and one-tap deep links for AI agents running in **tmux** on a remote server.
 
-You're running Claude Code in tmux on a VPS. You walk away. Claude finishes, or needs permission, or hits an error. **cc-notify sends a push notification to your phone** with context about what happened. Tap the notification and you're SSH'd into the exact tmux pane where Claude is waiting — no typing, no remembering which session, no manual SSH.
+## Who this is for
+
+You run Claude Code, Codex, Gemini CLI, or other AI agents inside **tmux sessions** on a VPS, cloud instance, or any machine reachable via SSH. You walk away — to make coffee, take a call, work on something else. When an agent finishes, needs permission, or hits an error, **cc-notify sends a push notification to your phone** with context about what happened. Tap the notification and [Blink Shell](https://blink.sh) opens an SSH connection straight into the exact tmux pane where the agent is waiting.
+
+**tmux is required.** cc-notify discovers sessions by walking the process tree to find parent tmux panes, builds deep links that attach to specific tmux sessions, and creates independent mobile viewports via grouped tmux sessions. Without tmux, the core notification and deep link features do not work.
+
+The remote machine can be anything reachable via SSH — a cloud VPS, a dedicated server, or even your laptop on the same network or connected via [Tailscale](https://tailscale.com).
 
 ## Key features
 
 - **Push notifications** via [ntfy](https://ntfy.sh) with rich context (task, last response, project name)
-- **Tap-to-connect deep links** via [Blink Shell](https://blink.sh) — one tap from notification to SSH session
+- **Tap-to-connect deep links** via [Blink Shell](https://blink.sh) — one tap from notification to the right tmux pane
+- **Any agent in tmux** — Claude Code, Codex, Gemini CLI, or anything else running in a tmux session
 - **Smart deduplication** — one notification per project, cooldown resets on interaction
-- **Multi-agent support** via optional [NTM](https://github.com/cyanheads/ntm) polling
+- **Multi-agent dashboard** via optional [NTM](https://github.com/cyanheads/ntm) polling
 - **Dual delivery** — ntfy + optional Slack webhook
 
 ## How it works
@@ -142,8 +149,10 @@ The mobile attach script creates a *grouped* tmux session (`mob-$$`) rather than
 
 ## Prerequisites
 
-- **Required:** `jq`, `curl`, `tmux`, `python3`
+- **Required:** [tmux](https://github.com/tmux/tmux) — your agents must run inside tmux sessions
+- **Required:** `jq`, `curl`, `python3`
 - **Required:** [ntfy](https://ntfy.sh) app on your phone (iOS/Android)
+- **Required:** A machine reachable via SSH (VPS, cloud instance, or local machine on Tailscale/LAN)
 - **Recommended:** [Blink Shell](https://blink.sh) — iOS SSH client for tap-to-connect deep links
 - **Optional:** [NTM](https://github.com/cyanheads/ntm) — needed for the multi-agent monitor
 
@@ -295,13 +304,15 @@ Edit `server/server.yml` with your domain, then set `NTFY_SERVER` in your config
 
 ## cc-notify vs Claude Code Remote Control
 
-Claude Code now has a built-in [Remote Control](https://docs.anthropic.com/en/docs/claude-code/remote-control) feature — connect to running sessions from your phone via `claude.ai/code` or the Claude iOS app, scan a QR code, auto-reconnect after sleep. These two approaches solve overlapping problems in different ways, and they can work together.
+Claude Code now has a built-in [Remote Control](https://docs.anthropic.com/en/docs/claude-code/remote-control) feature — connect to running sessions from your phone via `claude.ai/code` or the Claude iOS app, scan a QR code, auto-reconnect after sleep. These two tools solve overlapping problems in different ways, and they can work together.
+
+The key context: **Remote Control doesn't require tmux** — it works with any Claude Code session. **cc-notify requires tmux** — but in exchange gives you push notifications, deep links, multi-agent support, and a full terminal experience. If you already run your agents in tmux (which most VPS-based workflows do), cc-notify adds a layer that Remote Control can't.
 
 ### Two different philosophies
 
-**Remote Control** gives you a web-based window into a single Claude Code session. You open the app, find the session, see what's happening, type a response. It's a remote desktop for Claude Code.
+**Remote Control** gives you a web-based window into a single Claude Code session. You open the app, find the session, see what's happening, type a response. It's a remote viewer for Claude Code. It doesn't require any particular terminal setup.
 
-**cc-notify + Blink Shell** gives you a push-based notification system with one-tap deep links into your full terminal environment. You don't check — it tells you. You don't open a web UI — you tap a notification and land in your real tmux session via Blink Shell, with all your panes, tools, and layout intact.
+**cc-notify + Blink Shell** is built for tmux-based workflows. You run your agents in tmux sessions on a remote machine. cc-notify watches those sessions, pushes notifications when something needs attention, and gives you one-tap deep links that land you in the right tmux pane via Blink Shell — with your full terminal environment, layout, and tools.
 
 ### Comparison across five dimensions
 
