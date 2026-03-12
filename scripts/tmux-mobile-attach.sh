@@ -162,6 +162,10 @@ if [[ -n "$PANE" ]]; then
         if tmux resize-pane -Z -t "$S:.$PANE" 2>/dev/null; then
             _flag=$(tmux display-message -t "$S" -p '#{window_zoomed_flag}' 2>/dev/null || echo "dead")
             log "bg-zoom fired: flag=$_flag"
+            # Force a full terminal redraw — the unzoom+zoom sequence sends two
+            # rapid SIGWINCH signals which can leave readline's cursor tracking
+            # offset by 1-2 rows. refresh-client clears the stale render state.
+            tmux refresh-client -t "$S" 2>/dev/null && log "refresh-client OK" || true
         else
             log "bg-zoom FAILED (session/pane gone?)"
         fi
