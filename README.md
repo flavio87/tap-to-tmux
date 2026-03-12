@@ -425,6 +425,10 @@ The [official ntfy app](https://apps.apple.com/us/app/ntfy/id1625396347) is on t
 | Official app | Yes | Yes (Web Push) | No (M1+ only) | Yes |
 | ntfy-desktop | Yes | Yes (polling) | Yes | Yes |
 
+### Option D: Slack — cross-platform desktop notifications
+
+If you set `SLACK_WEBHOOK_URL` in your config, every notification also posts to a Slack channel. The Slack desktop app (macOS, Windows, Linux) delivers these as native OS notifications with sound. This works on any platform, requires no additional setup beyond the webhook, and means your agents can page both your phone (ntfy) and your desktop (Slack) simultaneously.
+
 ## cc-notify vs Claude Code Remote Control
 
 Claude Code now has a built-in [Remote Control](https://docs.anthropic.com/en/docs/claude-code/remote-control) feature — connect to running sessions from your phone via `claude.ai/code` or the Claude iOS app, scan a QR code, auto-reconnect after sleep. These two tools solve overlapping problems in different ways, and they can work together.
