@@ -168,12 +168,19 @@ Other benefits of grouped sessions that do hold:
   2. The "Connect" action button
   3. Blink Shell opening and connecting
   4. The tmux pane zoomed on mobile
-  Screenshots should go in a docs/images/ directory.
 -->
 
 <!-- TODO: Add a short (~30s) video walkthrough showing the tap-to-connect
   experience end-to-end. Host on GitHub or link to a public URL.
 -->
+
+### NTM dashboard
+
+If you use [ntm](https://github.com/flavio87/cc-notify) to manage multiple agent sessions, the NTM dashboard gives you a live overview of every session from your phone — with per-agent Connect buttons that tap directly into Blink:
+
+![NTM dashboard on mobile](docs/images/dashboard-mobile.png)
+
+Each card shows the session name, which agents are running (Claude, Codex, Gemini), their last active time, and a **Connect** button that fires the same Blink deep link as a notification tap. The **Overview** button attaches to the session's first pane without zooming.
 
 ## Notification delivery
 

@@ -79,15 +79,55 @@ One screenshot of the notification on a phone lock screen. Link to blog post for
 
 Nothing lands without this. Capture it first.
 
-**Script (~30 seconds):**
-1. Show a tmux session with Claude Code running a task
-2. Walk away (or cut to) — Claude finishes / hits a permission prompt
-3. iPhone lock screen — notification arrives with project name + context
-4. Tap the notification → Blink Shell opens → SSH connects → tmux pane appears, zoomed
-5. Optional: type a quick reply, send it
+**Structure: two acts, ~50 seconds total**
 
-**Tools:** iPhone screen mirror + terminal screen capture, or just record phone with camera
-pointed at screen for the "real" feel.
+### Act 1 — Notification → tap → zoomed pane (~25s) — lead with this
+
+**Shot 1 — Mac screen recording (~5s)**
+Open the NTM dashboard in Safari on iPhone, mirrored to Mac. Show 3–4 session cards,
+all yellow/idle. Header: "19 sessions · 29 agents". Cut to a tmux terminal where
+Claude Code is mid-task in cc-notify-demo. You're not watching it.
+
+**Shot 2 — iPhone (camera or screen mirror) (~3s)**
+Lock screen. Notification drops in:
+  `ovh2 · cc-notify-demo`
+  `Claude stopped and is waiting for input`
+Let it sit 1 second so viewers can read it.
+
+**Shot 3 — iPhone, same shot (~10s)**
+Tap the notification. Blink opens, SSH connects, tmux pane appears zoomed on the
+exact pane where Claude is waiting. Type a short reply (`y` + Enter). Claude continues.
+
+**Shot 4 — iPhone (~5s)**
+Blink session active, Claude responding. Detach or let run.
+
+### Act 2 — NTM dashboard (~20s)
+
+**Shot 5 — iPhone, NTM dashboard (~10s)**
+Open the NTM dashboard. Show session cards. Point out the session you just answered
+is now green/active. Tap "Connect" on another session to demonstrate it works the
+same way from the dashboard without needing a notification.
+
+**Shot 6 — iPhone, "+ New" modal (~8s)**
+Tap "+ New", type a project name, hit Launch. New card appears. Optional: tap
+Connect immediately — shows the spawn→connect flow.
+
+---
+
+**Recording logistics:**
+
+| What | How |
+|------|-----|
+| Mac terminal (tmux) | QuickTime screen recording |
+| iPhone lock screen + tap | Camera pointed at phone OR QuickTime iPhone mirror (macOS Sequoia) |
+| Blink connecting | iPhone screen mirror → Mac recording |
+| NTM dashboard | iPhone screen mirror → Mac recording |
+
+**Recommended:** Record desktop in one take. Record iPhone separately. The cut
+from lock screen → Blink → dashboard is the wow moment.
+
+**Tools:** Screenflick or QuickTime on Mac. Edit in iMovie or DaVinci Resolve (free).
+Add captions for the key moments — most viewers watch muted.
 
 ---
 
