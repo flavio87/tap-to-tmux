@@ -21,6 +21,7 @@ Push notifications and one-tap deep links for AI agents running in **tmux** on a
 - [Self-hosted ntfy server](#self-hosted-ntfy-server)
 - [cc-notify vs Claude Code Remote Control](#cc-notify-vs-claude-code-remote-control)
 - [FAQ](#faq)
+- [Open tasks](#open-tasks)
 
 ## Who this is for
 
@@ -530,7 +531,7 @@ You don't have to choose. Remote Control is great for interactive check-ins when
 
 ### Do I need an iPhone or Blink Shell?
 
-**No.** The push notifications work on any phone with the ntfy app (iOS or Android). The Blink Shell deep links are an iOS-specific bonus — without them, you still get notifications with full context (project name, what Claude was doing, what it said). You just connect to your server via your preferred SSH client instead of getting the one-tap experience. On Android, [Termux](https://termux.dev) with an SSH shortcut widget is a solid alternative.
+**No.** The push notifications work on any phone with the ntfy app (iOS or Android). The Blink Shell deep links are an iOS-specific bonus — without them, you still get notifications with full context (project name, what Claude was doing, what it said). You just connect to your server via your preferred SSH client instead of getting the one-tap experience. Android deep link support (equivalent to the Blink Shell integration on iOS) is not yet implemented — contributions welcome. See [open tasks](#open-tasks).
 
 ### Does this work with agents other than Claude Code?
 
@@ -563,6 +564,13 @@ Maybe. If you're running a single session and check your phone regularly, Claude
 ### Can I send notifications to Discord / Telegram / Teams / email?
 
 **Yes.** The hook architecture pipes structured data (title, priority, body, deep link URL) to shell functions that `curl` endpoints. ntfy and Slack are built-in; adding a new destination is ~15-35 lines of bash. See the [Notification delivery](#notification-delivery) section for integration guides and a Discord example.
+
+## Open tasks
+
+Known gaps and contributions welcome:
+
+- **Android deep links** — the iOS tap-to-connect flow uses Blink Shell's `blinkshell://` URI scheme. An equivalent for Android (e.g. via [Termux](https://termux.dev) intent URIs or another SSH client that supports deep links) is not yet implemented.
+- **Screenshots and demo video** — a 30-second screen recording of the full notification → tap → tmux pane flow would make the README significantly more useful.
 
 ## License
 
