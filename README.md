@@ -17,6 +17,7 @@ Push notifications and one-tap deep links for AI agents running in **tmux** on a
 - [Health check](#health-check)
 - [Troubleshooting](#troubleshooting)
 - [Project structure](#project-structure)
+- [Receiving notifications on macOS](#receiving-notifications-on-macos)
 - [Self-hosted ntfy server](#self-hosted-ntfy-server)
 - [cc-notify vs Claude Code Remote Control](#cc-notify-vs-claude-code-remote-control)
 - [FAQ](#faq)
@@ -381,6 +382,48 @@ docker compose up -d
 ```
 
 Edit `server/server.yml` with your domain, then set `NTFY_SERVER` in your config.
+
+## Receiving notifications on macOS
+
+The ntfy app handles iOS natively. On macOS there are three options depending on your hardware and preferences.
+
+### Option A: Safari PWA — simplest, any Mac (macOS Sonoma+)
+
+Works on any Mac running macOS 14 (Sonoma) or later. No app to install.
+
+1. Open Safari and go to your ntfy server (e.g. `https://ntfy.sh` or your self-hosted URL)
+2. Subscribe to your `NTFY_TOPIC`
+3. Click **Share → Add to Dock**
+4. macOS will ask for notification permission — allow it
+5. Notifications arrive even when Safari is closed
+
+**Limitation:** Safari Web Push delivers notifications silently (no sound). Action buttons and images are not supported. If you need sound, use Option B or C.
+
+### Option B: Official ntfy app — full features, Apple Silicon only
+
+The [official ntfy app](https://apps.apple.com/us/app/ntfy/id1625396347) is on the Mac App Store (free, by ntfy's author). Supports sound, action buttons, formatted messages, and self-hosted servers.
+
+**Requires:** Apple Silicon Mac (M1 or later). Intel Macs are not supported.
+
+1. Install ntfy from the Mac App Store
+2. Open the app → tap **+**
+3. Enter your ntfy server URL and topic
+4. Enable notifications in **System Settings → Notifications → ntfy**
+
+### Option C: ntfy-desktop — Intel + Apple Silicon, polling-based
+
+[ntfy-desktop by Aetherinox](https://github.com/Aetherinox/ntfy-desktop) is an Electron app that works on all Macs (Intel and Apple Silicon). It polls for notifications rather than using Web Push — slightly higher resource usage but fully compatible.
+
+1. Download the latest `.dmg` from [GitHub releases](https://github.com/Aetherinox/ntfy-desktop/releases)
+2. Open the `.dmg`, drag ntfy-desktop to Applications
+3. Launch it — it runs in the system tray
+4. Click **+** to add your topic and server URL
+
+| | Sound | Background delivery | Intel Mac | Self-hosted |
+|---|---|---|---|---|
+| Safari PWA | Silent only | Yes (Web Push) | Yes | Yes |
+| Official app | Yes | Yes (Web Push) | No (M1+ only) | Yes |
+| ntfy-desktop | Yes | Yes (polling) | Yes | Yes |
 
 ## cc-notify vs Claude Code Remote Control
 
