@@ -43,7 +43,28 @@ if ! tmux has-session -t "$SESSION" 2>/dev/null; then
 fi
 
 S="mob-$$"
-cleanup() { log "Cleanup: killing $S"; tmux kill-session -t "$S" 2>/dev/null; }
+cleanup() {
+    log "Cleanup: killing $S"
+
+    # Unzoom before killing — zoom state is window-level (shared across grouped sessions).
+    # Without this, the desktop is left with a zoomed pane at mobile dimensions.
+    local zoomed
+    zoomed=$(tmux display-message -t "$S" -p '#{window_zoomed_flag}' 2>/dev/null || echo "0")
+    if [[ "$zoomed" == "1" ]]; then
+        log "Unzooming shared pane before cleanup"
+        tmux resize-pane -Z -t "$S" 2>/dev/null || true
+    fi
+
+    tmux kill-session -t "$S" 2>/dev/null
+
+    # Nudge desktop clients to recalculate window size now that the mobile
+    # client (window-size latest) is gone. Without this the window can stay
+    # at phone dimensions until the desktop client resizes itself.
+    tmux list-clients -t "$SESSION" -F '#{client_name}' 2>/dev/null \
+        | while read -r _client; do
+            tmux refresh-client -t "$_client" 2>/dev/null || true
+          done
+}
 trap cleanup EXIT
 
 log "Creating grouped session $S -> $SESSION"
