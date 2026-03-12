@@ -149,25 +149,30 @@ if [[ -n "$PANE" ]]; then
     # debuggable. The job runs while tmux attach blocks the main script.
     (
         sleep 0.5
-        # resize-pane -Z is a toggle. If the window is already zoomed from a
-        # previous mob session, calling -Z would unzoom instead of zoom. Always
-        # unzoom first to get to a known state, then select pane, then zoom.
+        # resize-pane -Z is a toggle. Check current state before deciding what to do.
+        # On reconnect the zoom from the previous mob session persists on the shared
+        # window — if we're already zoomed on the right pane, skip entirely (no resize,
+        # no cursor offset). Only unzoom+select+zoom if the wrong pane is zoomed.
         _flag=$(tmux display-message -t "$S" -p '#{window_zoomed_flag}' 2>/dev/null || echo "0")
-        log "bg-zoom: pre-zoom flag=$_flag"
-        if [[ "$_flag" == "1" ]]; then
-            log "bg-zoom: unzooming first (toggle guard)"
+        _pane_active=$(tmux display-message -t "$S:.$PANE" -p '#{pane_active}' 2>/dev/null || echo "0")
+        log "bg-zoom: flag=$_flag pane_active=$_pane_active"
+        if [[ "$_flag" == "1" && "$_pane_active" == "1" ]]; then
+            log "bg-zoom: already zoomed on correct pane — nothing to do"
+        elif [[ "$_flag" == "1" ]]; then
+            log "bg-zoom: zoomed on wrong pane — unzoom, select, zoom"
             tmux resize-pane -Z -t "$S" 2>/dev/null
-        fi
-        tmux select-pane -t "$S:.$PANE" 2>/dev/null
-        if tmux resize-pane -Z -t "$S:.$PANE" 2>/dev/null; then
-            _flag=$(tmux display-message -t "$S" -p '#{window_zoomed_flag}' 2>/dev/null || echo "dead")
-            log "bg-zoom fired: flag=$_flag"
-            # Force a full terminal redraw — the unzoom+zoom sequence sends two
-            # rapid SIGWINCH signals which can leave readline's cursor tracking
-            # offset by 1-2 rows. refresh-client clears the stale render state.
-            tmux refresh-client -t "$S" 2>/dev/null && log "refresh-client OK" || true
+            tmux select-pane -t "$S:.$PANE" 2>/dev/null
+            tmux resize-pane -Z -t "$S:.$PANE" 2>/dev/null
+            log "bg-zoom fired: flag=$(tmux display-message -t "$S" -p '#{window_zoomed_flag}' 2>/dev/null)"
         else
-            log "bg-zoom FAILED (session/pane gone?)"
+            log "bg-zoom: not zoomed — select and zoom"
+            tmux select-pane -t "$S:.$PANE" 2>/dev/null
+            if tmux resize-pane -Z -t "$S:.$PANE" 2>/dev/null; then
+                _flag=$(tmux display-message -t "$S" -p '#{window_zoomed_flag}' 2>/dev/null || echo "dead")
+                log "bg-zoom fired: flag=$_flag"
+            else
+                log "bg-zoom FAILED (session/pane gone?)"
+            fi
         fi
         sleep 1
         _flag2=$(tmux display-message -t "$S" -p '#{window_zoomed_flag}' 2>/dev/null || echo "dead")
