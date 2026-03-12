@@ -17,7 +17,7 @@ Push notifications and one-tap deep links for AI agents running in **tmux** on a
 - [Health check](#health-check)
 - [Troubleshooting](#troubleshooting)
 - [Project structure](#project-structure)
-- [Receiving notifications on macOS](#receiving-notifications-on-macos)
+- [Receiving notifications on desktop](#receiving-notifications-on-desktop)
 - [Self-hosted ntfy server](#self-hosted-ntfy-server)
 - [cc-notify vs Claude Code Remote Control](#cc-notify-vs-claude-code-remote-control)
 - [FAQ](#faq)
@@ -383,11 +383,15 @@ docker compose up -d
 
 Edit `server/server.yml` with your domain, then set `NTFY_SERVER` in your config.
 
-## Receiving notifications on macOS
+## Receiving notifications on desktop
 
-The ntfy app handles iOS natively. On macOS there are three options depending on your hardware and preferences.
+The ntfy app handles iOS and Android natively. For desktop, you have two paths: ntfy (macOS-specific options) or Slack (works everywhere).
 
-### Option A: Safari PWA — simplest, any Mac (macOS Sonoma+)
+### macOS
+
+Three options depending on your hardware:
+
+**Safari PWA — simplest, any Mac (macOS Sonoma+)**
 
 Works on any Mac running macOS 14 (Sonoma) or later. No app to install.
 
@@ -397,26 +401,24 @@ Works on any Mac running macOS 14 (Sonoma) or later. No app to install.
 4. macOS will ask for notification permission — allow it
 5. Notifications arrive even when Safari is closed
 
-**Limitation:** Safari Web Push delivers notifications silently (no sound). Action buttons and images are not supported. If you need sound, use Option B or C.
+**Limitation:** Safari Web Push is silent (no sound). If you need sound, use one of the options below.
 
-### Option B: Official ntfy app — full features, Apple Silicon only
+**Official ntfy app — full features, Apple Silicon only**
 
-The [official ntfy app](https://apps.apple.com/us/app/ntfy/id1625396347) is on the Mac App Store (free, by ntfy's author). Supports sound, action buttons, formatted messages, and self-hosted servers.
-
-**Requires:** Apple Silicon Mac (M1 or later). Intel Macs are not supported.
+The [official ntfy app](https://apps.apple.com/us/app/ntfy/id1625396347) is on the Mac App Store (free, by ntfy's author). Supports sound, action buttons, formatted messages, and self-hosted servers. **Requires M1 or later** — Intel Macs not supported.
 
 1. Install ntfy from the Mac App Store
 2. Open the app → tap **+**
 3. Enter your ntfy server URL and topic
 4. Enable notifications in **System Settings → Notifications → ntfy**
 
-### Option C: ntfy-desktop — Intel + Apple Silicon, polling-based
+**ntfy-desktop — Intel + Apple Silicon, polling-based**
 
-[ntfy-desktop by Aetherinox](https://github.com/Aetherinox/ntfy-desktop) is an Electron app that works on all Macs (Intel and Apple Silicon). It polls for notifications rather than using Web Push — slightly higher resource usage but fully compatible.
+[ntfy-desktop by Aetherinox](https://github.com/Aetherinox/ntfy-desktop) is an Electron app that works on all Macs. Polls for notifications rather than using Web Push — slightly higher resource usage but works on Intel.
 
 1. Download the latest `.dmg` from [GitHub releases](https://github.com/Aetherinox/ntfy-desktop/releases)
 2. Open the `.dmg`, drag ntfy-desktop to Applications
-3. Launch it — it runs in the system tray
+3. Launch it — runs in the system tray
 4. Click **+** to add your topic and server URL
 
 | | Sound | Background delivery | Intel Mac | Self-hosted |
@@ -425,9 +427,9 @@ The [official ntfy app](https://apps.apple.com/us/app/ntfy/id1625396347) is on t
 | Official app | Yes | Yes (Web Push) | No (M1+ only) | Yes |
 | ntfy-desktop | Yes | Yes (polling) | Yes | Yes |
 
-### Option D: Slack — cross-platform desktop notifications
+### macOS, Windows, Linux — via Slack
 
-If you set `SLACK_WEBHOOK_URL` in your config, every notification also posts to a Slack channel. The Slack desktop app (macOS, Windows, Linux) delivers these as native OS notifications with sound. This works on any platform, requires no additional setup beyond the webhook, and means your agents can page both your phone (ntfy) and your desktop (Slack) simultaneously.
+Set `SLACK_WEBHOOK_URL` in your config and every notification also posts to a Slack channel. The Slack desktop app delivers these as native OS notifications with sound on any platform. No extra setup beyond the webhook — and it means your agents can page both your phone (ntfy) and your desktop (Slack) at the same time.
 
 ## cc-notify vs Claude Code Remote Control
 
