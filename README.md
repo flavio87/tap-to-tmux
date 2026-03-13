@@ -2,6 +2,13 @@
 
 Push notifications and one-tap deep links for AI agents running in **tmux** on a remote server.
 
+<!-- Demo video — replace URL after uploading MP4 to a GitHub issue:
+     1. Go to github.com/flavio87/cc-notify/issues/new
+     2. Drag your MP4 into the text box — GitHub uploads it and gives you a URL
+     3. Replace the src below with that URL, then delete these comments
+<video src="https://github.com/user-attachments/assets/REPLACE-ME/cc-notify-demo.mp4" controls width="800"></video>
+-->
+
 ## Table of contents
 
 - [Who this is for](#who-this-is-for)
