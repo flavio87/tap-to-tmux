@@ -2,7 +2,7 @@
 
 Push notifications and one-tap deep links for AI agents running in **tmux** on a remote server.
 
-<video src="docs/demo.mp4" controls width="800"></video>
+<video src="https://github.com/flavio87/cc-notify/releases/download/v0.1-demo/cc-notify-demo-20260314_212001.mp4" controls width="800"></video>
 
 ## Table of contents
 
