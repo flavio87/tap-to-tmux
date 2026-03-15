@@ -143,19 +143,14 @@ stateDiagram-v2
 
 ### Why grouped sessions?
 
-The mobile attach script creates a *grouped* tmux session (`mob-$$`) rather than attaching directly. Grouped sessions share the same windows but can have independent settings — which lets mobile get its own `window-size latest` (adapts to phone dimensions) while the real session stays on `window-size largest` (desktop always wins).
+The mobile attach script creates a *grouped* tmux session (`mob-$$`) rather than attaching directly. Grouped sessions share the same windows but can have independent settings — which lets mobile get its own `window-size latest` viewport sized for your phone.
 
-**The honest caveat:** tmux fundamentally shares window dimensions across all clients viewing the same window. There is no mode where desktop and mobile have truly independent sizes — this is a tmux architectural constraint, not a bug in tap-to-tmux. In practice:
+**Desktop resize behavior:** when your phone connects, the shared window will temporarily un-zoom on your desktop — this is a tmux constraint, not a bug. As soon as you close Blink and disconnect, the `mob-*` session is destroyed and your desktop resumes its normal layout automatically. The pane you're connected to also gets zoomed on mobile, so your phone shows one focused pane rather than a scaled-down version of your full layout.
 
-- **Desktop will briefly resize** when your phone connects (phone dimensions win until tmux enforces `largest`)
-- **`window-size largest`** means your desktop terminal always recovers to its own size — but there's a brief flicker on connection
-- **Zoom to single pane** (`PANE` argument in the deep link) is what makes mobile usable: your phone fills one pane rather than trying to display your full multi-pane layout at desktop scale
-- **On disconnect**, the script unzooms the shared pane and calls `refresh-client` on all desktop clients so the window snaps back cleanly
-
-Other benefits of grouped sessions that do hold:
-- Multiple mobile connections don't interfere with each other (each gets its own `mob-*` session)
+Other benefits:
+- Multiple mobile connections don't interfere (each gets its own `mob-*` session)
 - Stale connections from dropped SSH sessions are cleaned up automatically
-- The `mob-*` session is fully destroyed on detach — no tmux cruft accumulates
+- The `mob-*` session is destroyed on detach — no tmux cruft accumulates
 
 ### Requirements for deep links
 
@@ -165,16 +160,6 @@ Other benefits of grouped sessions that do hold:
 
 > **Without Blink Shell:** Notifications still work — you just won't get the tap-to-connect button. You can still SSH in manually using the session info in the notification body.
 
-<!-- TODO: Add screenshots showing the full user flow:
-  1. Notification appearing on iOS lock screen
-  2. The "Connect" action button
-  3. Blink Shell opening and connecting
-  4. The tmux pane zoomed on mobile
--->
-
-<!-- TODO: Add a short (~30s) video walkthrough showing the tap-to-connect
-  experience end-to-end. Host on GitHub or link to a public URL.
--->
 
 ### NTM dashboard
 
@@ -451,21 +436,17 @@ Set `SLACK_WEBHOOK_URL` in your config and every notification also posts to a Sl
 
 ## tap-to-tmux vs Claude Code Remote Control
 
-Claude Code now has a built-in [Remote Control](https://docs.anthropic.com/en/docs/claude-code/remote-control) feature — connect to running sessions from your phone via `claude.ai/code` or the Claude iOS app, scan a QR code, auto-reconnect after sleep. These two tools solve overlapping problems in different ways, and they can work together.
-
-The key context: **Remote Control doesn't require tmux** — it works with any Claude Code session. **tap-to-tmux requires tmux** — but in exchange gives you push notifications, deep links, multi-agent support, and a full terminal experience. If you already run your agents in tmux (which most VPS-based workflows do), tap-to-tmux adds a layer that Remote Control can't.
+Claude Code has a built-in [Remote Control](https://docs.anthropic.com/en/docs/claude-code/remote-control) feature — connect from your phone via `claude.ai/code` or the Claude iOS app. These two tools solve overlapping problems in different ways, and they can work together. Remote Control works with any Claude Code session; tap-to-tmux requires tmux but adds push notifications, deep links, multi-agent support, and a full terminal experience.
 
 ### Two different philosophies
 
-**Remote Control** gives you a web-based window into a single Claude Code session. You open the app, find the session, see what's happening, type a response. It's a remote viewer for Claude Code. It doesn't require any particular terminal setup.
+**Remote Control** gives you a web-based window into a single Claude Code session. You open the app, find the session, see what's happening, type a response. It doesn't require any particular terminal setup.
 
-**tap-to-tmux + Blink Shell** is built for tmux-based workflows. You run your agents in tmux sessions on a remote machine. tap-to-tmux watches those sessions, pushes notifications when something needs attention, and gives you one-tap deep links that land you in the right tmux pane via Blink Shell — with your full terminal environment, layout, and tools.
+**tap-to-tmux + Blink Shell** is built for tmux-based workflows. tap-to-tmux watches your sessions, pushes notifications when something needs attention, and gives you one-tap deep links that land you in the right tmux pane via Blink Shell — with your full terminal environment, layout, and tools.
 
 ### Comparison across five dimensions
 
 #### 1. Awareness — how do you know something needs attention?
-
-This is the fundamental difference.
 
 | | Remote Control | tap-to-tmux + Blink |
 |---|---|---|
@@ -487,20 +468,19 @@ tap-to-tmux is built around the opposite model: you walk away, and **it finds yo
 | **What you land in** | Web-based terminal in a browser/app | Native terminal (Blink Shell) attached to your tmux session |
 | **Pane targeting** | Lands in the session (no pane control) | Deep link targets the exact pane where Claude is waiting, zoomed |
 
-The deep link flow in tap-to-tmux means you go from lock screen to the right tmux pane in a single tap. Blink Shell handles the SSH connection, `tmux-mobile-attach.sh` creates an independent mobile viewport, selects the pane, and zooms it. No manual SSH, no finding the session, no navigating panes.
-
 #### 3. The experience once connected
 
 | | Remote Control | tap-to-tmux + Blink |
 |---|---|---|
 | **Interface** | Web UI (responsive, but browser-based) | Full native terminal via Blink Shell |
+| **Live terminal state** | Message relay — conversation history syncs, but unsent input doesn't appear on other devices | Same tmux session — what you type on your phone appears on your desktop instantly, before you hit submit |
 | **Send prompts** | Yes, via web editor | Yes, via Blink terminal (full keyboard, shell access) |
 | **See live output** | Yes, in the web view | Yes, in your real tmux session |
 | **Access other tools** | No — scoped to the CC session | Yes — full shell, other panes, vim, git, anything |
 | **Custom tmux layouts** | No — web renders its own view | Yes — your desktop layout is preserved; mobile gets an independent viewport |
 | **Terminal features** | Limited (web rendering) | Full (Blink supports mosh, key forwarding, themes, fonts) |
 
-Both let you see what Claude is doing and send prompts. The difference is depth: Remote Control gives you a Claude-scoped web view, while Blink gives you your full terminal environment. If you need to check a log file, run a test, or peek at another pane while Claude is waiting — Blink has it, Remote Control doesn't.
+With tap-to-tmux + Blink, you're attached to your actual tmux session — there's no relay layer. Remote Control gives you a Claude-scoped web view; Blink gives you your full terminal environment.
 
 #### 4. Scale — multiple agents and projects
 
@@ -510,8 +490,6 @@ Both let you see what Claude is doing and send prompts. The difference is depth:
 | **Dashboard / overview** | Session list in web UI | NTM dashboard shows all agents with status, health, uptime |
 | **Non-CC agents** (Codex, Gemini CLI, etc.) | Not supported | Fully supported via NTM polling |
 | **Per-project deduplication** | N/A | One notification per project, cooldown until you interact |
-
-This is where the gap is widest. If you run multiple agents across projects — especially mixed agent types — Remote Control has no way to aggregate or notify. tap-to-tmux with NTM gives you a single dashboard plus targeted notifications.
 
 #### 5. Infrastructure and privacy
 
@@ -537,7 +515,7 @@ This is where the gap is widest. If you run multiple agents across projects — 
 
 ### They're complementary
 
-You don't have to choose. Remote Control is great for interactive check-ins when you're actively working from your phone. tap-to-tmux is great for the other 90% of the time — when you've walked away and need to know the moment something needs attention, then get back to the right place in one tap.
+You don't have to choose — Remote Control for interactive check-ins when you're actively working from your phone, tap-to-tmux for when you've walked away and need to know the moment something needs attention.
 
 ## Other integrations
 
@@ -587,7 +565,6 @@ Maybe. If you're running a single session and check your phone regularly, Claude
 Known gaps and contributions welcome:
 
 - **Android deep links** — the iOS tap-to-connect flow uses Blink Shell's `blinkshell://` URI scheme. An equivalent for Android (e.g. via [Termux](https://termux.dev) intent URIs or another SSH client that supports deep links) is not yet implemented.
-- **Screenshots and demo video** — a 30-second screen recording of the full notification → tap → tmux pane flow would make the README significantly more useful.
 
 ## License
 
