@@ -16,6 +16,7 @@ Push notifications and one-tap deep links for AI agents running in **tmux** on a
 - [Configuration](#configuration)
 - [Claude Code hooks setup](#claude-code-hooks-setup)
 - [Starting the services](#starting-the-services)
+- [macOS setup](#macos-setup)
 - [Health check](#health-check)
 - [Troubleshooting](#troubleshooting)
 - [Project structure](#project-structure)
@@ -267,7 +268,8 @@ All settings live in `~/.config/tap-to-tmux/config.env`:
 | `NTFY_TOPIC` | Yes | Unique topic name for your notification channel. Generate one: `python3 -c "import secrets; print(f'tap-to-tmux-{secrets.token_hex(8)}')"` |
 | `MACHINE` | No | Display name in notification titles. Defaults to hostname. |
 | `SSH_USER` | No | Username for deep link SSH commands. Defaults to current user. |
-| `SSH_HOST` | No | Hostname/IP for deep link SSH commands. Defaults to hostname. |
+| `SSH_HOST` | No | Hostname/IP for deep link SSH commands. Defaults to hostname. On macOS with Tailscale, set this to your Tailscale MagicDNS name (e.g. `my-mac.tail1234.ts.net`). |
+| `SSH_REMOTE_HOME` | No | Home directory path on the remote machine. Defaults to `/home/$SSH_USER`. **macOS users must set this** to `/Users/$SSH_USER` since macOS uses `/Users/` not `/home/`. |
 | `NTFY_SERVER` | No | ntfy server URL. Defaults to `https://ntfy.sh` (public). Set to your self-hosted URL if desired. |
 | `BLINK_KEY` | No | Blink Shell x-callback-url key for tap-to-connect on iOS. Leave empty to disable deep links. |
 | `SLACK_WEBHOOK_URL` | No | Slack incoming webhook URL for dual delivery. Leave empty to disable. |
@@ -319,6 +321,102 @@ systemctl --user enable --now ntm-serve
 systemctl --user enable --now ntm-dashboard
 ```
 
+## macOS setup
+
+tap-to-tmux works on macOS with a few extra steps. The main differences from a Linux VPS: tmux is installed via Homebrew, SSH is managed by macOS System Settings, and Tailscale is the easiest way to make your Mac reachable from your phone when you're away from home.
+
+### 1. Install tmux
+
+```bash
+brew install tmux
+```
+
+### 2. Configure your connection details
+
+In `~/.config/tap-to-tmux/config.env`, macOS requires two settings that differ from Linux defaults:
+
+```bash
+# macOS home is /Users/, not /home/
+SSH_REMOTE_HOME="/Users/your-username"
+
+# Use Tailscale MagicDNS for reliable remote access
+SSH_HOST="your-mac.tail1234.ts.net"
+```
+
+To find your Tailscale hostname: `tailscale status | head -1` — it looks like `your-mac.tail1234.ts.net`.
+
+### 3. Enable SSH (Remote Login)
+
+**System Settings → General → Sharing → Remote Login → On**
+
+Make sure your user is listed under "Allow access for".
+
+### 4. Restrict SSH to Tailscale only (recommended)
+
+By default macOS sshd listens on all interfaces. To restrict it to Tailscale only, use `pf` firewall rules. First find your Tailscale interface and iPhone's Tailscale IP:
+
+```bash
+# Find your Tailscale interface (the one with your 100.x.x.x IP)
+ifconfig | grep -B5 '100\.' | grep '^utun'
+
+# Find your iPhone's Tailscale IP
+tailscale status | grep -i iphone
+```
+
+Then create a pf anchor — replace `utunX` with your interface and `100.x.x.x` with your iPhone's IP:
+
+```bash
+sudo tee /etc/pf.anchors/tap-to-tmux << 'EOF'
+pass in quick on utunX proto tcp from 100.x.x.x to any port 22
+block in quick on utunX proto tcp to port 22
+EOF
+```
+
+Add to `/etc/pf.conf` (before the final blank line):
+
+```
+anchor "tap-to-tmux"
+load anchor "tap-to-tmux" from "/etc/pf.anchors/tap-to-tmux"
+```
+
+Load the rules:
+
+```bash
+sudo pfctl -ef /etc/pf.conf
+```
+
+> **Note:** The `pass` rule must come before the `block` rule — pf uses `quick` to stop on first match.
+
+### 5. Set up Blink Shell for deep links
+
+In [Blink Shell](https://blink.sh) on your iPhone:
+
+1. **Add a host:** Settings → Hosts → + → set Hostname to your Tailscale address, User to your Mac username, and select your SSH key
+2. **Get your x-callback-url key:** Settings → Advanced → x-callback-url — copy the key
+3. **Add to config:** set `BLINK_KEY` in `~/.config/tap-to-tmux/config.env`
+4. **Add your Mac's public key to Blink** (or generate one in Blink and add it to `~/.ssh/authorized_keys` on your Mac)
+
+### 6. Always start Claude Code inside tmux
+
+Deep links attach to the specific tmux session where your agent is running. Start a named session before running Claude Code:
+
+```bash
+# Outside tmux — creates a clean standalone session
+tmux new-session -d -s myproject
+tmux attach -t myproject
+# Now run: claude
+```
+
+> **Tip:** Avoid creating sessions from inside an existing tmux window — tmux will auto-append `-1` to the session name, which can cause stale deep links.
+
+### Verify everything works
+
+```bash
+ntfy-health-check.sh --send-test
+```
+
+A test notification should arrive on your phone. Tap it — Blink should SSH into your Mac and attach to the tmux session.
+
 ## Health check
 
 Run the built-in health check to verify your setup:
@@ -340,8 +438,17 @@ ntfy-health-check.sh --send-test  # also send a test notification
 - Default cooldown is 24h. Override with `NTFY_COOLDOWN_SECONDS` in config.
 
 **Deep links not working:**
-- Blink Shell deep links require `BLINK_KEY` to be set. Find it in Blink Settings > x-callback-url.
+- Blink Shell deep links require `BLINK_KEY` to be set. Find it in Blink Settings → Advanced → x-callback-url.
 - Other SSH clients: set `SSH_USER` and `SSH_HOST`, then use the notification body to manually SSH in.
+- **macOS:** Make sure `SSH_REMOTE_HOME="/Users/your-username"` is set — the default `/home/` path doesn't exist on macOS and the script won't find itself.
+
+**Deep link says "session does not exist" (macOS):**
+- The tmux session name in the deep link must exactly match `tmux list-sessions`. Check for an unexpected `-1` suffix — this happens when you create a session from inside an existing tmux window (it becomes a grouped session). Create sessions from outside tmux: `tmux new-session -d -s name`.
+- Make sure `tmux` is on the PATH in SSH sessions: add `export PATH="/opt/homebrew/bin:$PATH"` to `~/.zprofile`.
+
+**SSH connection refused from Blink (macOS):**
+- Confirm Remote Login is on: System Settings → General → Sharing → Remote Login.
+- If you set up pf rules, confirm your iPhone's Tailscale IP hasn't changed: `tailscale status | grep iphone`. Update `/etc/pf.anchors/tap-to-tmux` and reload with `sudo pfctl -ef /etc/pf.conf` if it has.
 
 **NTM monitor not detecting agents:**
 - Verify NTM is installed: `ntm --version`

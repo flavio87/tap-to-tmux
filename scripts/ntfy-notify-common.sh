@@ -85,9 +85,9 @@ build_blink_url() {
 
     local ssh_cmd
     if [[ -n "$pane_index" ]]; then
-        ssh_cmd="ssh -t ${SSH_USER}@${SSH_HOST} /home/${SSH_USER}/.local/bin/tmux-mobile-attach.sh ${session} ${pane_index}"
+        ssh_cmd="ssh -t ${SSH_USER}@${SSH_HOST} ${SSH_REMOTE_HOME:-/home/${SSH_USER}}/.local/bin/tmux-mobile-attach.sh ${session} ${pane_index}"
     else
-        ssh_cmd="ssh -t ${SSH_USER}@${SSH_HOST} /home/${SSH_USER}/.local/bin/tmux-mobile-attach.sh ${session}"
+        ssh_cmd="ssh -t ${SSH_USER}@${SSH_HOST} ${SSH_REMOTE_HOME:-/home/${SSH_USER}}/.local/bin/tmux-mobile-attach.sh ${session}"
     fi
     local encoded_cmd
     encoded_cmd=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$ssh_cmd")
