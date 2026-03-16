@@ -2,7 +2,7 @@
 
 Push notifications and one-tap deep links for AI agents running in **tmux** on a remote server.
 
-<video src="https://github.com/user-attachments/assets/6aa5c793-08c8-4040-8756-bd0b82609990" controls width="800"></video>
+<video src="https://github.com/flavio87/tap-to-tmux/releases/download/v0.1-demo/tap-to-tmux-demo-final-20260317_004906.mp4" controls width="800"></video>
 
 ## Table of contents
 
