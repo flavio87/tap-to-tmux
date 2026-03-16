@@ -7,6 +7,15 @@
 # We always need to create/attach to the server's tmux, so unset it.
 unset TMUX
 
+# macOS SSH sessions don't inherit TMPDIR, so tmux can't find the socket.
+# Locate the socket explicitly and wrap tmux to always use it.
+_tmux_socket="/tmp/tmux-$(id -u)/default"
+if [[ ! -S "$_tmux_socket" ]]; then
+    _tmux_socket=$(find /tmp /private/tmp -name "default" -path "*/tmux-$(id -u)/*" 2>/dev/null | head -1)
+fi
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+tmux() { command tmux -S "$_tmux_socket" "$@"; }
+
 SESSION="${1:?Usage: tmux-mobile-attach.sh SESSION [PANE_INDEX]}"
 PANE="${2:-}"
 LOG="/tmp/tmux-mobile-attach.log"
@@ -43,10 +52,22 @@ fi
 # without touching sessions — this prevents the loser's kill loop from
 # destroying the mob session the winner just created.
 LOCK_FILE="/tmp/tap-to-tmux-mobile-${SESSION}.lock"
-exec 200>"$LOCK_FILE"
-if ! flock -n 200; then
-    log "LOSER: flock held by another PID — exiting duplicate (no sessions touched)"
-    exit 0
+if [[ "$(uname)" == "Darwin" ]]; then
+    # macOS: flock is not available. Use atomic mkdir instead.
+    # Clean up any stale file-based lock left by old flock implementations.
+    [[ -f "$LOCK_FILE" ]] && unlink "$LOCK_FILE"
+    if ! mkdir "$LOCK_FILE" 2>/dev/null; then
+        log "LOSER: lock held by another PID — exiting duplicate (no sessions touched)"
+        exit 0
+    fi
+    trap 'rmdir "$LOCK_FILE" 2>/dev/null' EXIT
+else
+    # Linux: use flock — kernel-guaranteed, auto-releases if process crashes.
+    exec 200>"$LOCK_FILE"
+    if ! flock -n 200; then
+        log "LOSER: flock held by another PID — exiting duplicate (no sessions touched)"
+        exit 0
+    fi
 fi
 log "WINNER: acquired lock at $(ts)"
 
@@ -125,7 +146,11 @@ log "Grouped session $S created OK"
 # Release the lock now — the establishment race is over.
 # Holding it for the full session lifetime would block future taps while
 # Blink keeps this SSH connection alive in the background.
-flock -u 200
+if [[ "$(uname)" == "Darwin" ]]; then
+    rmdir "$LOCK_FILE" 2>/dev/null
+else
+    flock -u 200
+fi
 log "Lock released (establishment complete)"
 
 log "Sessions after new-session:"
