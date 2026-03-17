@@ -396,9 +396,9 @@ In [Blink Shell](https://blink.sh) on your iPhone:
 3. **Add to config:** set `BLINK_KEY` in `~/.config/tap-to-tmux/config.env`
 4. **Add your Mac's public key to Blink** (or generate one in Blink and add it to `~/.ssh/authorized_keys` on your Mac)
 
-### 6. Always start Claude Code inside tmux
+### 6. Always start inside tmux — or better, use NTM to spawn a full multi-agent setup
 
-Deep links attach to the specific tmux session where your agent is running. Start a named session before running Claude Code:
+Deep links attach to the specific tmux session where your agent is running. For a single agent, start a named tmux session manually:
 
 ```bash
 # Outside tmux — creates a clean standalone session
@@ -408,6 +408,19 @@ tmux attach -t myproject
 ```
 
 > **Tip:** Avoid creating sessions from inside an existing tmux window — tmux will auto-append `-1` to the session name, which can cause stale deep links.
+
+Or better yet, use **[NTM](https://github.com/Dicklesworthstone/ntm)** — a CLI that spawns and tiles multiple AI agents (Claude Code, Codex, Gemini) across tmux panes in one command:
+
+```bash
+# Install
+brew install dicklesworthstone/tap/ntm
+# or: curl -fsSL https://raw.githubusercontent.com/Dicklesworthstone/ntm/main/install.sh | bash
+
+# Launch a multi-agent setup: 1 Claude Code + 1 Codex in a named session
+ntm spawn myproject --cc=1 --cod=1
+```
+
+Panes are auto-labeled (`myproject__cc_1`, `myproject__cod_1`). tap-to-tmux hooks and deep links work with NTM-spawned sessions out of the box — each pane gets its own notification and one-tap connect link.
 
 ### Verify everything works
 
