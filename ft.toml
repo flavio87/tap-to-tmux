@@ -1,0 +1,65 @@
+# ft configuration file
+# See: https://github.com/Dicklesworthstone/frankenterm for documentation
+
+[general]
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+# Log format: pretty (human) or json (machine)
+log_format = "pretty"
+# Optional log file path
+# log_file = "~/.ft/ft.log"
+
+[ingest]
+# Base poll interval in milliseconds
+# WARNING: Low values (e.g., 200ms) flood the WezTerm mux socket and kill
+# remote mux proxy connections. 5000ms is safe for event detection.
+poll_interval_ms = 10000
+# Minimum poll interval (adaptive polling lower bound)
+min_poll_interval_ms = 5000
+# Maximum concurrent pane captures (low to avoid flooding WezTerm mux socket)
+max_concurrent_captures = 3
+# Enable gap detection
+gap_detection = true
+
+[storage]
+# Database file name (relative to workspace .ft/ directory)
+db_path = "ft.db"
+# Retention period in days (0 = unlimited)
+retention_days = 30
+# Maximum database size in MB (0 = unlimited)
+retention_max_mb = 1000
+
+[patterns]
+# Enabled pattern packs
+enabled_packs = ["builtin:core"]
+
+[workflows]
+# Enabled workflows (by name)
+enabled = ["handle_compaction", "handle_usage_limits"]
+# Maximum concurrent workflows
+max_concurrent = 3
+
+[notifications]
+# Only fire webhooks for high-value events (rate limits, auth, errors)
+notify_only = false
+
+[[notifications.webhooks]]
+name = "ntfy"
+url = "https://ntfy.carlquest.com/cc-notify-c2557d446273a22d"
+method = "POST"
+headers = { "Priority" = "high", "Tags" = "warning,ovh2" }
+# ft sends JSON body with event details; ntfy accepts it as the notification body
+
+[notifications.desktop]
+enabled = false
+
+[notifications.email]
+enabled = false
+
+[safety]
+# Require prompt to be active for send operations
+require_prompt_active = true
+# Block sends during alt-screen
+block_alt_screen = true
+# Block sends when there's a recent capture gap
+block_recent_gap = true
