@@ -9,6 +9,7 @@ Restart=always
 RestartSec=5
 Environment=HOME=%h
 Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PROJECTS_DIR=/data/projects
 
 [Install]
 WantedBy=default.target

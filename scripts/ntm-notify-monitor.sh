@@ -103,6 +103,10 @@ check_and_notify() {
         # Map health fields to our state model:
         #   activity=active → agent process is running → ACTIVE (regardless of stage)
         #   activity=idle → agent waiting for input → WAITING
+        #   activity=stale → ntm lost track of agent activity → treat as WAITING
+        #     (stale means ntm never observed CPU activity since tracking started,
+        #      i.e. idle_seconds is epoch-relative nonsense. Codex agents often go
+        #      stale when ntm spawns after the agent is already running.)
         #   status=error/unhealthy → ERROR
         # Note: stage=stuck with activity=active means ntm thinks the agent MIGHT
         # need help, but the process is still running. We treat this as ACTIVE to
@@ -110,7 +114,7 @@ check_and_notify() {
         local effective_state
         if [[ "$status" == "error" || "$status" == "unhealthy" ]]; then
             effective_state="ERROR"
-        elif [[ "$activity" == "idle" ]]; then
+        elif [[ "$activity" == "idle" || "$activity" == "stale" ]]; then
             effective_state="WAITING"
         else
             effective_state="ACTIVE"
