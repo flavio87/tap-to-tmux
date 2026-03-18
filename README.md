@@ -271,6 +271,7 @@ All settings live in `~/.config/tap-to-tmux/config.env`:
 | `SSH_HOST` | No | Hostname/IP for deep link SSH commands. Defaults to hostname. On macOS with Tailscale, set this to your Tailscale MagicDNS name (e.g. `my-mac.tail1234.ts.net`). |
 | `SSH_REMOTE_HOME` | No | Home directory path on the remote machine. Defaults to `/home/$SSH_USER`. **macOS users must set this** to `/Users/$SSH_USER` since macOS uses `/Users/` not `/home/`. |
 | `NTFY_SERVER` | No | ntfy server URL. Defaults to `https://ntfy.sh` (public). Set to your self-hosted URL if desired. |
+| `NTFY_TOKEN` | No | ntfy access token for authenticated servers. Required when `auth-default-access: deny-all` is set. Generate in the ntfy web UI under Account → Access tokens. |
 | `BLINK_KEY` | No | Blink Shell x-callback-url key for tap-to-connect on iOS. Leave empty to disable deep links. |
 | `SLACK_WEBHOOK_URL` | No | Slack incoming webhook URL for dual delivery. Leave empty to disable. |
 | `PROJECTS_DIR` | No | Directory containing your project repos. Defaults to `$HOME/projects`. Used by the NTM monitor for session matching. |
@@ -446,6 +447,14 @@ ntfy-health-check.sh --send-test  # also send a test notification
 2. Check `NTFY_TOPIC` in your config matches the topic you subscribed to in the ntfy app
 3. Check logs: `cat /tmp/tap-to-tmux-logs/tmux-notify.log`
 
+**Notifications arrive but show no content (empty body on iOS):**
+- Your ntfy server requires authentication. The app is receiving the push ping but getting 403 when fetching the message body.
+- Fix: re-subscribe in the ntfy app with username + password. See [Subscribing on iOS with a self-hosted authenticated server](#subscribing-on-ios-with-a-self-hosted-authenticated-server).
+
+**HTTP 403 errors in the notification log:**
+- Check `cat /tmp/tap-to-tmux-logs/ntfy-notify.log` for `FAILED HTTP 403` lines.
+- If your server uses access control, set `NTFY_TOKEN` in `~/.config/tap-to-tmux/config.env` and grant the user access: `docker exec ntfy ntfy access <user> <topic> rw`.
+
 **Duplicate notifications:**
 - The cooldown system should prevent these. Check: `ls -la /tmp/tap-to-tmux-cooldown/`
 - Default cooldown is 24h. Override with `NTFY_COOLDOWN_SECONDS` in config.
@@ -505,6 +514,42 @@ docker compose up -d
 ```
 
 Edit `server/server.yml` with your domain, then set `NTFY_SERVER` in your config.
+
+### Authentication (self-hosted)
+
+If your server uses `auth-default-access: deny-all` (recommended), you need to create a user and grant it access to your topic:
+
+```bash
+# Create a user
+docker exec ntfy ntfy user add tap-to-tmux
+
+# Grant read-write access to your topic
+docker exec ntfy ntfy access tap-to-tmux your-topic-name rw
+
+# Create an access token for the user (used in config instead of a password)
+docker exec ntfy ntfy token add tap-to-tmux
+```
+
+Then set `NTFY_TOKEN` in `~/.config/tap-to-tmux/config.env` with the generated token (`tk_...`).
+
+### Subscribing on iOS with a self-hosted authenticated server
+
+The ntfy iOS app requires a **username and password** to subscribe to a protected topic — it does not support token-only auth in its subscribe dialog. The simplest approach is to set a password for your ntfy user:
+
+```bash
+# Set a password for the ntfy user
+docker exec -e NTFY_PASSWORD='YourPassword' ntfy ntfy user change-pass tap-to-tmux
+```
+
+Then in the ntfy iOS app:
+1. Tap **+** → enter your server URL (e.g. `https://ntfy.yourdomain.com`)
+2. Enter your topic name
+3. When prompted for credentials: **username** = your ntfy username, **password** = the password you just set
+4. Tap Subscribe
+
+The iOS app will use those credentials to fetch message content. The access token (`NTFY_TOKEN`) is used separately by tap-to-tmux scripts to publish notifications from your machine.
+
+> **Troubleshooting:** If you receive empty push notifications (no body content visible), the app is likely subscribed without auth — it receives the push ping but gets 403 when fetching the message. Delete and re-add the subscription with credentials.
 
 ## Receiving notifications on desktop
 

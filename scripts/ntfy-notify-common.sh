@@ -291,6 +291,11 @@ send_ntfy_notification() {
         -H "Tags: $tags"
     )
 
+    # Add auth token if configured
+    if [[ -n "${NTFY_TOKEN:-}" ]]; then
+        curl_args+=( -H "Authorization: Bearer ${NTFY_TOKEN}" )
+    fi
+
     # Only add Click/Actions headers if blink_url is non-empty
     if [[ -n "$blink_url" ]]; then
         curl_args+=( -H "Click: $blink_url" )
