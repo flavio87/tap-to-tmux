@@ -141,8 +141,8 @@ if [[ -n "$LAST_TASK" || -n "$LAST_RESPONSE" ]]; then
     ntfy_log INFO "Context: task='${LAST_TASK:0:80}' response='${LAST_RESPONSE:0:80}'"
 fi
 
-# Build deep link
-BLINK_LINK=$(build_blink_url "$TMUX_SESSION" "$TMUX_PANE_INDEX")
+# Build deep link (Blink on iOS, Termux on Android, or empty if neither configured)
+DEEP_LINK=$(build_deep_link_url "$TMUX_SESSION" "$TMUX_PANE_INDEX")
 
 # Build notification content based on event type
 case "$NOTIFICATION_TYPE" in
@@ -199,6 +199,6 @@ esac
 
 # Send via shared function (runs in background for non-blocking hook)
 ntfy_log INFO "Sending: '${TITLE}' priority=${PRIORITY}"
-send_ntfy_notification "$TITLE" "$PRIORITY" "$TAGS" "$BODY" "$BLINK_LINK" &
+send_ntfy_notification "$TITLE" "$PRIORITY" "$TAGS" "$BODY" "$DEEP_LINK" &
 
 exit 0

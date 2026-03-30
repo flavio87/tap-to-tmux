@@ -28,7 +28,7 @@ send_agent_notification() {
     local session="$1" pane_index="$2" agent_type="$3" state="$4"
 
     local blink_url
-    blink_url=$(build_blink_url "$session" "$pane_index")
+    blink_url=$(build_deep_link_url "$session" "$pane_index")
 
     # Extract context: tries ntm --robot-tail first, falls back to tmux capture-pane
     extract_pane_context_robot "$session" "$pane_index"

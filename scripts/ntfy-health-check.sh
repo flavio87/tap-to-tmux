@@ -255,7 +255,7 @@ fi
 if [[ "$SEND_TEST" == "1" ]]; then
     echo ""
     echo "=== Send Test Notification ==="
-    blink_url=$(build_blink_url "test-session")
+    blink_url=$(build_deep_link_url "test-session")
     if send_ntfy_notification \
         "${MACHINE}: Health Check Test" \
         "low" \

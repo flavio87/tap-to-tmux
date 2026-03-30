@@ -20,6 +20,7 @@ MACHINE="${MACHINE:-$(hostname -s)}"
 SSH_USER="${SSH_USER:-$(whoami)}"
 SSH_HOST="${SSH_HOST:-$(hostname)}"
 BLINK_KEY="${BLINK_KEY:-}"
+TERMUX_ENABLED="${TERMUX_ENABLED:-}"
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
 
 # Use XDG_RUNTIME_DIR (per-user, mode 0700) when available, fall back to /tmp.
@@ -98,6 +99,40 @@ build_blink_url() {
     local encoded_cmd
     encoded_cmd=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$ssh_cmd")
     echo "blinkshell://run?key=${BLINK_KEY}&cmd=${encoded_cmd}"
+}
+
+# Build a Termux deep link URL for a given tmux session and pane (Android)
+# Requires allow-external-apps=true in ~/.termux/termux.properties on the phone.
+# Usage: build_termux_url SESSION [PANE_INDEX]
+build_termux_url() {
+    local session="$1" pane_index="$2"
+
+    if [[ "${TERMUX_ENABLED:-}" != "true" ]]; then
+        echo ""
+        return
+    fi
+
+    local ssh_cmd
+    if [[ -n "$pane_index" ]]; then
+        ssh_cmd="ssh -t ${SSH_USER}@${SSH_HOST} ${SSH_REMOTE_HOME:-/home/${SSH_USER}}/.local/bin/tmux-mobile-attach.sh ${session} ${pane_index}"
+    else
+        ssh_cmd="ssh -t ${SSH_USER}@${SSH_HOST} ${SSH_REMOTE_HOME:-/home/${SSH_USER}}/.local/bin/tmux-mobile-attach.sh ${session}"
+    fi
+    local encoded_cmd
+    encoded_cmd=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$ssh_cmd")
+    echo "termux://run?command=${encoded_cmd}"
+}
+
+# Build a deep link URL using whichever mobile terminal is configured.
+# Tries Blink (iOS) first, then Termux (Android). Returns empty if neither is set.
+# Usage: build_deep_link_url SESSION [PANE_INDEX]
+build_deep_link_url() {
+    local url
+    url=$(build_blink_url "$@")
+    if [[ -z "$url" ]]; then
+        url=$(build_termux_url "$@")
+    fi
+    echo "$url"
 }
 
 # Extract task and context from tmux pane output

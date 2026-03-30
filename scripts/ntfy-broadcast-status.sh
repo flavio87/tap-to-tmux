@@ -31,7 +31,7 @@ for session in $(tmux list-sessions -F '#{session_name}' 2>/dev/null); do
     done < <(echo "$result" | jq -c '.agents[]' 2>/dev/null)
 
     if [[ "$has_attention" == "1" ]]; then
-        blink_url=$(build_blink_url "$session")
+        blink_url=$(build_deep_link_url "$session")
         title="${MACHINE}/${session}: Needs Attention"
         ntfy_log INFO "Broadcast: ${title}"
         echo "Sending: $title"
