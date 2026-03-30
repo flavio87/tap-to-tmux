@@ -199,6 +199,6 @@ esac
 
 # Send via shared function (runs in background for non-blocking hook)
 ntfy_log INFO "Sending: '${TITLE}' priority=${PRIORITY}"
-send_ntfy_notification "$TITLE" "$PRIORITY" "$TAGS" "$BODY" "$DEEP_LINK" &
+send_ntfy_notification "$TITLE" "$PRIORITY" "$TAGS" "$BODY" "$DEEP_LINK" "$TMUX_SESSION" "$TMUX_PANE_INDEX" &
 
 exit 0

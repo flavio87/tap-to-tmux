@@ -312,9 +312,15 @@ send_slack_notification() {
 }
 
 # Send an ntfy notification (and optionally Slack)
-# Usage: send_ntfy_notification TITLE PRIORITY TAGS BODY BLINK_URL
+# Usage: send_ntfy_notification TITLE PRIORITY TAGS BODY DEEP_LINK [SESSION] [PANE]
 send_ntfy_notification() {
-    local title="$1" priority="$2" tags="$3" body="$4" blink_url="$5"
+    local title="$1" priority="$2" tags="$3" body="$4" deep_link="$5"
+    local session="${6:-}" pane="${7:-}"
+    # Append machine-readable session/pane metadata for mobile connect scripts
+    if [[ -n "$session" ]]; then
+        body="${body}
+--tap-to-tmux:session=${session}:pane=${pane:-0}"
+    fi
     body="${body:0:500}"
 
     ntfy_log INFO "Sending: title='${title}' priority=${priority}"
@@ -331,10 +337,10 @@ send_ntfy_notification() {
         curl_args+=( -H "Authorization: Bearer ${NTFY_TOKEN}" )
     fi
 
-    # Only add Click/Actions headers if blink_url is non-empty
-    if [[ -n "$blink_url" ]]; then
-        curl_args+=( -H "Click: $blink_url" )
-        curl_args+=( -H "Actions: view, Connect, ${blink_url}" )
+    # Only add Click/Actions headers if deep_link is non-empty
+    if [[ -n "$deep_link" ]]; then
+        curl_args+=( -H "Click: $deep_link" )
+        curl_args+=( -H "Actions: view, Connect, ${deep_link}" )
     fi
 
     curl_args+=( -d "$body" "$NTFY_URL" )
@@ -349,5 +355,5 @@ send_ntfy_notification() {
     fi
 
     # Also send to Slack (non-blocking, failures logged but don't affect return)
-    send_slack_notification "$title" "$priority" "$body" "$blink_url"
+    send_slack_notification "$title" "$priority" "$body" "$deep_link"
 }
