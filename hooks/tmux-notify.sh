@@ -95,9 +95,15 @@ fi
 # --- Active pane suppression ---
 # Skip notification if the user is actively focused on the pane (both pane and
 # window must be active to avoid false suppression in split-pane layouts).
+# NOTE: We use list-panes (not display-message) because display-message -t
+# evaluates #{window_active} in the target pane's context, always returning 1.
+# list-panes -s gives the true window_active from the session's perspective.
 if [[ "${SUPPRESS_WHEN_ACTIVE:-none}" == "pane" && -n "$TMUX_SESSION" && -n "$TMUX_PANE_INDEX" ]]; then
-    _pane_active=$(tmux display-message -t "${TMUX_SESSION}:.${TMUX_PANE_INDEX}" -p '#{pane_active}' 2>/dev/null || echo "0")
-    _window_active=$(tmux display-message -t "${TMUX_SESSION}:.${TMUX_PANE_INDEX}" -p '#{window_active}' 2>/dev/null || echo "0")
+    _pane_state=$(tmux list-panes -t "${TMUX_SESSION}" -s \
+        -F '#{pane_index} #{pane_active} #{window_active}' 2>/dev/null \
+        | awk -v idx="$TMUX_PANE_INDEX" '$1 == idx {print $2, $3}')
+    _pane_active="${_pane_state%% *}"
+    _window_active="${_pane_state##* }"
     if [[ "$_pane_active" == "1" && "$_window_active" == "1" ]]; then
         ntfy_log INFO "Pane ${TMUX_SESSION}:.${TMUX_PANE_INDEX} is actively focused, suppressing notification"
         exit 0
