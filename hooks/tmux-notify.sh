@@ -92,6 +92,18 @@ if [[ -z "$TMUX_SESSION" ]]; then
     ntfy_log WARN "Tmux lookup failed, falling back to project name: ${PROJECT}"
 fi
 
+# --- Active pane suppression ---
+# Skip notification if the user is actively focused on the pane (both pane and
+# window must be active to avoid false suppression in split-pane layouts).
+if [[ "${SUPPRESS_WHEN_ACTIVE:-none}" == "pane" && -n "$TMUX_SESSION" && -n "$TMUX_PANE_INDEX" ]]; then
+    _pane_active=$(tmux display-message -t "${TMUX_SESSION}:.${TMUX_PANE_INDEX}" -p '#{pane_active}' 2>/dev/null || echo "0")
+    _window_active=$(tmux display-message -t "${TMUX_SESSION}:.${TMUX_PANE_INDEX}" -p '#{window_active}' 2>/dev/null || echo "0")
+    if [[ "$_pane_active" == "1" && "$_window_active" == "1" ]]; then
+        ntfy_log INFO "Pane ${TMUX_SESSION}:.${TMUX_PANE_INDEX} is actively focused, suppressing notification"
+        exit 0
+    fi
+fi
+
 # Extract context from transcript (CC-specific: richer than pane capture)
 # Transcript format: JSONL with multiple entry types:
 #   queue-operation (operation=enqueue) → human-typed messages
