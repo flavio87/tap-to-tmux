@@ -72,16 +72,18 @@ date +%s > "$COOLDOWN_FILE"
 # panes share the same directory or when a pane was moved between sessions.
 TMUX_SESSION=""
 TMUX_PANE_INDEX=""
+TMUX_WINDOW_INDEX=""
 _pid=$$
 while [[ "$_pid" -gt 1 ]]; do
     # Skip mob-* grouped sessions — they're ephemeral mobile viewports,
     # not the real session. Deep links must target the actual session.
-    _match=$(tmux list-panes -a -F '#{pane_pid} #{session_name} #{pane_index}' 2>/dev/null \
-        | awk -v pid="$_pid" '$1 == pid && $2 !~ /^mob-/ {print $2, $3}')
+    _match=$(tmux list-panes -a -F '#{pane_pid} #{session_name} #{pane_index} #{window_index}' 2>/dev/null \
+        | awk -v pid="$_pid" '$1 == pid && $2 !~ /^mob-/ {print $2, $3, $4}')
     if [[ -n "$_match" ]]; then
         TMUX_SESSION=$(echo "$_match" | awk '{print $1}')
         TMUX_PANE_INDEX=$(echo "$_match" | awk '{print $2}')
-        ntfy_log INFO "Tmux lookup: SESSION=${TMUX_SESSION} PANE=${TMUX_PANE_INDEX}"
+        TMUX_WINDOW_INDEX=$(echo "$_match" | awk '{print $3}')
+        ntfy_log INFO "Tmux lookup: SESSION=${TMUX_SESSION} WINDOW=${TMUX_WINDOW_INDEX} PANE=${TMUX_PANE_INDEX}"
         break
     fi
     _pid=$(ps -o ppid= -p "$_pid" 2>/dev/null | tr -d ' ')
@@ -95,11 +97,20 @@ fi
 # --- Active pane suppression ---
 # Skip notification if the user is actively focused on the pane (both pane and
 # window must be active to avoid false suppression in split-pane layouts).
+# NOTE: We use list-panes (not display-message) because display-message -t
+# evaluates #{window_active} in the target pane's context, always returning 1.
+# list-panes -s gives the true window_active from the session's perspective.
+# We match on both window_index and pane_index to avoid false matches when
+# multiple windows have panes with the same index.
 if [[ "${SUPPRESS_WHEN_ACTIVE:-none}" == "pane" && -n "$TMUX_SESSION" && -n "$TMUX_PANE_INDEX" ]]; then
-    _pane_active=$(tmux display-message -t "${TMUX_SESSION}:.${TMUX_PANE_INDEX}" -p '#{pane_active}' 2>/dev/null || echo "0")
-    _window_active=$(tmux display-message -t "${TMUX_SESSION}:.${TMUX_PANE_INDEX}" -p '#{window_active}' 2>/dev/null || echo "0")
+    _pane_state=$(tmux list-panes -t "${TMUX_SESSION}" -s \
+        -F '#{window_index} #{pane_index} #{pane_active} #{window_active}' 2>/dev/null \
+        | awk -v widx="$TMUX_WINDOW_INDEX" -v pidx="$TMUX_PANE_INDEX" \
+            '$1 == widx && $2 == pidx {print $3, $4}')
+    _pane_active="${_pane_state%% *}"
+    _window_active="${_pane_state##* }"
     if [[ "$_pane_active" == "1" && "$_window_active" == "1" ]]; then
-        ntfy_log INFO "Pane ${TMUX_SESSION}:.${TMUX_PANE_INDEX} is actively focused, suppressing notification"
+        ntfy_log INFO "Pane ${TMUX_SESSION}:${TMUX_WINDOW_INDEX}.${TMUX_PANE_INDEX} is actively focused, suppressing notification"
         exit 0
     fi
 fi
