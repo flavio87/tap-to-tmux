@@ -285,7 +285,7 @@ function agentName(type) {
 function formatAgentStatus(agent) {
   if (agent.activity === 'active') return 'working now';
 
-  // last_active = ISO timestamp of last time CPU was active (from server sampler)
+  // last_active = ISO timestamp of when the agent stopped working (active→idle transition)
   if (agent.last_active) {
     const d = new Date(agent.last_active);
     const now = new Date();
@@ -306,19 +306,10 @@ function formatAgentStatus(agent) {
       ? time
       : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + time;
 
-    return `stopped ${dateStr} (${ago})`;
+    return `idle since ${dateStr} (${ago})`;
   }
 
   // No last_active means never seen active since dashboard started.
-  // Use elapsed_seconds to show how long the process has been running.
-  if (agent.elapsed_seconds != null) {
-    const hrs = Math.floor(agent.elapsed_seconds / 3600);
-    const days = Math.floor(hrs / 24);
-    if (days > 0) return `idle (running ${days}d ${hrs % 24}h)`;
-    if (hrs > 0) return `idle (running ${hrs}h)`;
-    return 'idle';
-  }
-
   return 'idle';
 }
 
