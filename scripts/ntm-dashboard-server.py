@@ -262,6 +262,12 @@ _activity_lock = threading.Lock()
 _activity_cache = {}       # key -> bool (True=active)
 _last_active_ts = {}       # key -> ISO timestamp of last time agent was active
 _agent_elapsed = {}        # key -> process elapsed seconds (for "running since")
+_prev_activity = {}        # key -> bool from previous cycle (for transition detection)
+_consecutive_active = {}   # key -> int, consecutive active cycles (debounce spikes)
+
+# Require this many consecutive active cycles before declaring "active".
+# A single spike from GC/heartbeat (1 cycle ≈ 3s) is ignored.
+_ACTIVE_DEBOUNCE_CYCLES = 2
 
 
 def _cpu_sampler_loop():
@@ -287,10 +293,36 @@ def _cpu_sampler_loop():
                 ticks = _read_cpu_ticks(info["pid"])
                 if ticks is not None and key in t1:
                     delta = ticks - t1[key]
-                    is_active = delta > _ACTIVE_TICK_THRESHOLD
+                    raw_active = delta > _ACTIVE_TICK_THRESHOLD
+
+                    # Debounce: require consecutive active cycles to filter
+                    # GC/heartbeat spikes (~7-17 ticks) that occasionally
+                    # exceed the threshold for a single cycle.
+                    if raw_active:
+                        _consecutive_active[key] = \
+                            _consecutive_active.get(key, 0) + 1
+                    else:
+                        _consecutive_active[key] = 0
+                    is_active = (
+                        _consecutive_active.get(key, 0)
+                        >= _ACTIVE_DEBOUNCE_CYCLES
+                    )
+
                     new_activity[key] = is_active
-                    if is_active:
+
+                    # Record "stopped at" timestamp on active→idle transition.
+                    # This captures when the agent finished working, not when
+                    # it happened to spike once.  While still active, keep
+                    # updating the timestamp so it reflects the latest moment.
+                    was_active = _prev_activity.get(key, False)
+                    if was_active and not is_active:
+                        # Transition: was working, now idle → record stop time
                         _last_active_ts[key] = now_iso
+                    elif is_active:
+                        # Still working → keep updating (will be snapshot when
+                        # it eventually stops)
+                        _last_active_ts[key] = now_iso
+
                 # Also grab elapsed time
                 elapsed = _read_elapsed_seconds(info["pid"])
                 if elapsed is not None:
@@ -299,11 +331,16 @@ def _cpu_sampler_loop():
             with _activity_lock:
                 _activity_cache.update(new_activity)
                 _agent_elapsed.update(new_elapsed)
+                # Save current activity for next cycle's transition detection
+                _prev_activity.update(new_activity)
                 # Clean stale entries (sessions that no longer exist)
                 live_keys = set(agents.keys())
                 for stale in set(_activity_cache.keys()) - live_keys:
                     _activity_cache.pop(stale, None)
                     _agent_elapsed.pop(stale, None)
+                    _last_active_ts.pop(stale, None)
+                    _prev_activity.pop(stale, None)
+                    _consecutive_active.pop(stale, None)
 
         except Exception:
             pass
