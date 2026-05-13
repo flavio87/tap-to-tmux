@@ -269,6 +269,30 @@ _consecutive_active = {}   # key -> int, consecutive active cycles (debounce spi
 # A single spike from GC/heartbeat (1 cycle ≈ 3s) is ignored.
 _ACTIVE_DEBOUNCE_CYCLES = 2
 
+# Persist last_active timestamps to disk so they survive restarts.
+_RUNTIME_BASE = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+_LAST_ACTIVE_FILE = os.path.join(_RUNTIME_BASE, "tap-to-tmux-state",
+                                 "dashboard-last-active.json")
+
+
+def _load_last_active():
+    """Load persisted last_active timestamps from disk."""
+    try:
+        with open(_LAST_ACTIVE_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_last_active():
+    """Persist last_active timestamps to disk."""
+    try:
+        os.makedirs(os.path.dirname(_LAST_ACTIVE_FILE), exist_ok=True)
+        with open(_LAST_ACTIVE_FILE, "w") as f:
+            json.dump(_last_active_ts, f)
+    except OSError:
+        pass
+
 
 def _cpu_sampler_loop():
     """Background loop: sample CPU ticks twice, 3s apart, update cache."""
@@ -342,6 +366,9 @@ def _cpu_sampler_loop():
                     _prev_activity.pop(stale, None)
                     _consecutive_active.pop(stale, None)
 
+            # Persist timestamps to disk (survives restarts)
+            _save_last_active()
+
         except Exception:
             pass
 
@@ -350,6 +377,8 @@ def _cpu_sampler_loop():
 
 
 def _start_sampler():
+    # Restore persisted timestamps from previous run
+    _last_active_ts.update(_load_last_active())
     t = threading.Thread(target=_cpu_sampler_loop, daemon=True)
     t.start()
 
