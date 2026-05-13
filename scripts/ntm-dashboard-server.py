@@ -240,6 +240,40 @@ def _read_cpu_ticks(pid):
         return None
 
 
+def _read_cpu_ticks_tree(pid):
+    """Sum CPU ticks across `pid` and all its descendants.
+
+    Required for agents whose tmux-pane child is a thin wrapper that spawns
+    a separate worker binary. Codex's tree looks like:
+
+        node /home/ubuntu/.bun/bin/codex   ← immediate child, ~0 ticks
+          └─ codex (Rust binary)           ← grandchild, does all the work
+
+    Sampling only the immediate node wrapper made codex permanently look
+    idle, so the active→idle transition that records `last_active` never
+    fired. Walking the whole subtree fixes that and stays correct for
+    single-process agents (claude) where the subtree is just `pid` itself.
+    """
+    total = _read_cpu_ticks(pid)
+    if total is None:
+        return None
+    try:
+        result = subprocess.run(
+            ["pgrep", "-P", str(pid)],
+            capture_output=True, text=True, timeout=3
+        )
+        for cpid in result.stdout.strip().split("\n"):
+            cpid = cpid.strip()
+            if not cpid:
+                continue
+            sub = _read_cpu_ticks_tree(int(cpid))
+            if sub is not None:
+                total += sub
+    except Exception:
+        pass
+    return total
+
+
 def _read_elapsed_seconds(pid):
     """Read elapsed time of a process from /proc/PID/stat (no subprocess)."""
     try:
@@ -303,7 +337,7 @@ def _cpu_sampler_loop():
             # First snapshot
             t1 = {}
             for key, info in agents.items():
-                ticks = _read_cpu_ticks(info["pid"])
+                ticks = _read_cpu_ticks_tree(info["pid"])
                 if ticks is not None:
                     t1[key] = ticks
 
@@ -314,7 +348,7 @@ def _cpu_sampler_loop():
             new_activity = {}
             new_elapsed = {}
             for key, info in agents.items():
-                ticks = _read_cpu_ticks(info["pid"])
+                ticks = _read_cpu_ticks_tree(info["pid"])
                 if ticks is not None and key in t1:
                     delta = ticks - t1[key]
                     raw_active = delta > _ACTIVE_TICK_THRESHOLD
