@@ -40,16 +40,21 @@ _VALID_SESSION_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _PROJECTS_DIR = os.environ.get("PROJECTS_DIR", os.path.expanduser("~/projects"))
 
 # CPU tick threshold: above this in a 3-second window = actively working.
-# Claude Code's idle event loop uses ~7-17 ticks/3s (heartbeats, keepalive).
-# Truly active agents (mid-turn) use 100+ ticks/3s.
-# Idle Codex (bun) uses 0 ticks/3s.
-# Threshold of 30 cleanly separates idle-loop from real work.
+# Sampling is across the whole descendant tree (see _read_cpu_ticks_tree),
+# which sets the idle floor by the busiest worker we can reach:
+#   - Claude Code (no descendants): ~1-5 ticks/3s when idle.
+#   - Codex (node wrapper → codex Rust binary): ~7-24 ticks/3s when idle,
+#     with sporadic GC/telemetry bursts up to ~75 ticks/3s.
+#   - Truly active agents (mid-turn) sustain 100+ ticks/3s.
+# Threshold of 60 sits above codex's burstiest idle samples (75 was rare and
+# never observed twice in a row in 90s of sampling) and well below real work,
+# so the 2-cycle debounce reliably suppresses false-positives.
 try:
     _ACTIVE_TICK_THRESHOLD = int(
-        os.environ.get("DASHBOARD_ACTIVE_TICK_THRESHOLD", "30")
+        os.environ.get("DASHBOARD_ACTIVE_TICK_THRESHOLD", "60")
     )
 except ValueError:
-    _ACTIVE_TICK_THRESHOLD = 30
+    _ACTIVE_TICK_THRESHOLD = 60
 
 # --- Security: bearer token auth (optional) ---
 # Set DASHBOARD_TOKEN to require Authorization: Bearer <token> on API endpoints.

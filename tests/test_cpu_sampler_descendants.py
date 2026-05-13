@@ -103,3 +103,33 @@ def test_tree_sampling_captures_grandchild_work(wrapper_process):
         f"Tree sampler only saw {delta} ticks over 3s — grandchild work "
         f"is not being attributed to the wrapper subtree."
     )
+
+
+def test_active_threshold_separates_idle_bursts_from_real_work():
+    """The threshold must sit above codex's noisy idle baseline.
+
+    With tree-sampling the codex node→Rust wrapper produces 7-24 ticks/3s
+    at rest plus occasional GC/telemetry bursts up to ~75 ticks/3s (see
+    fix/codex-cpu-sampling-descendant-tree investigation). The threshold
+    was raised from 30 to 60 to keep those bursts on the idle side while
+    still triggering on the 100+ ticks/3s seen during real model work.
+
+    This test pins the regime so future tuning doesn't silently regress
+    into the noise band.
+    """
+    mod = _load_dashboard_module()
+
+    threshold = mod._ACTIVE_TICK_THRESHOLD
+    # Must be high enough that a single isolated codex burst (~75) does not
+    # cross it. Together with the 2-cycle debounce, this prevents fake
+    # "idle since 1m ago" timestamps when the agent did no real work.
+    assert threshold > 30, (
+        f"Threshold {threshold} is too low — codex's idle tree-sampled "
+        f"baseline (7-24 ticks/3s, bursts to ~75) will trip false actives."
+    )
+    # Must stay well below true active work (100+ ticks/3s), otherwise real
+    # turns won't get marked active and last_active won't get recorded.
+    assert threshold < 100, (
+        f"Threshold {threshold} is too high — real model work won't be "
+        f"detected and active→idle transitions will never fire."
+    )
